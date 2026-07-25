@@ -23,22 +23,27 @@ async function isAdmin(request: Request): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAdmin(request))) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  try {
+    if (!(await isAdmin(request))) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { data, error } = await supabaseAdmin.storage
+      .from(VIDEO_BUCKET)
+      .list("", { limit: 200, sortBy: { column: "name", order: "asc" } });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Only real files (skip folder placeholders).
+    const files = (data || [])
+      .filter((f) => f.id !== null && f.name && !f.name.endsWith("/"))
+      .map((f) => f.name);
+
+    return NextResponse.json({ files }, { status: 200 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown server error.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-
-  const { data, error } = await supabaseAdmin.storage
-    .from(VIDEO_BUCKET)
-    .list("", { limit: 200, sortBy: { column: "name", order: "asc" } });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // Only real files (skip folder placeholders).
-  const files = (data || [])
-    .filter((f) => f.id !== null && f.name && !f.name.endsWith("/"))
-    .map((f) => f.name);
-
-  return NextResponse.json({ files }, { status: 200 });
 }

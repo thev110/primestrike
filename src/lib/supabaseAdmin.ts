@@ -34,4 +34,4 @@ export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
 });
 
 // Bucket that holds the protected videos (private bucket).
-export const VIDEO_BUCKET = process.env.SUPABASE_VIDEO_BUCKET || "videos";
+export const VIDEO_BUCKET = process.env.SUPABASE_VIDEO_BUCKET || "Videos";

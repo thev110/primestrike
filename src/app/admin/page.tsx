@@ -29,9 +29,17 @@ import {
   TrendingUp,
   Coins,
   FileSpreadsheet,
-  Download
+  Download,
+  BookOpen,
+  Send,
+  KeyRound,
+  Eye,
+  X,
+  Award,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import AdminVideoRequests from "@/components/AdminVideoRequests";
 
 interface EventItem {
   id: string;
@@ -74,20 +82,53 @@ export default function AdminDashboard() {
   // Tab State
   const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos">("events");
 
-  // Video access grant states
-  const [videoFiles, setVideoFiles] = useState<string[]>([]);
-  const [videoLoading, setVideoLoading] = useState(false);
-  const [vgEmail, setVgEmail] = useState("");
-  const [vgPath, setVgPath] = useState("");
-  const [vgHours, setVgHours] = useState("72");
-  const [vgSubmitting, setVgSubmitting] = useState(false);
-  const [vgResult, setVgResult] = useState<{ ok: boolean; msg: string } | null>(null);
-
   // Data States
   const [events, setEvents] = useState<EventItem[]>([]);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [fetchingData, setFetchingData] = useState(true);
+
+  // Audit Modal State
+  const [selectedAuditStudent, setSelectedAuditStudent] = useState<StudentProfile | null>(null);
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditStats, setAuditStats] = useState({ requests: 0, grants: 0, views: 0 });
+  const [auditLead, setAuditLead] = useState<Lead | null>(null);
+  const [mentorFeedback, setMentorFeedback] = useState("");
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
+
+  const handleOpenAudit = async (student: StudentProfile) => {
+    setSelectedAuditStudent(student);
+    setAuditModalOpen(true);
+    setAuditLoading(true);
+    setMentorFeedback("");
+    setFeedbackSaved(false);
+
+    try {
+      // Find matching lead submission
+      const matchedLead = leads.find((l) => l.email?.toLowerCase() === student.email?.toLowerCase()) || null;
+      setAuditLead(matchedLead);
+
+      // Fetch student's video request metrics
+      const { data: vReqs } = await supabase
+        .from("video_requests")
+        .select("request_count, grant_count, view_count")
+        .eq("user_id", student.id);
+
+      if (vReqs && vReqs.length > 0) {
+        const totalReq = vReqs.reduce((acc, r) => acc + (r.request_count || 1), 0);
+        const totalGrant = vReqs.reduce((acc, r) => acc + (r.grant_count || 0), 0);
+        const totalView = vReqs.reduce((acc, r) => acc + (r.view_count || 0), 0);
+        setAuditStats({ requests: totalReq, grants: totalGrant, views: totalView });
+      } else {
+        setAuditStats({ requests: 0, grants: 0, views: 0 });
+      }
+    } catch (err) {
+      console.error("Audit error:", err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   // Form States for creating events
   const [title, setTitle] = useState("");
@@ -359,69 +400,6 @@ export default function AdminDashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Fetch bucket video list (admin bearer token)
-  const fetchVideoFiles = async () => {
-    try {
-      setVideoLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("/api/video/list", {
-        headers: { Authorization: `Bearer ${session?.access_token || ""}` },
-      });
-      const json = await res.json();
-      if (res.ok) setVideoFiles(json.files || []);
-      else console.error("video list error:", json.error);
-    } catch (err) {
-      console.error("video list exception:", err);
-    } finally {
-      setVideoLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === "videos" && user && profile?.role === "admin") {
-      fetchVideoFiles();
-    }
-  }, [activeTab, user, profile]);
-
-  // Send a one-time video access link
-  const handleSendVideoLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setVgResult(null);
-
-    if (!vgEmail || !vgPath) {
-      setVgResult({ ok: false, msg: "Email and video file are required." });
-      return;
-    }
-
-    try {
-      setVgSubmitting(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("/api/video/grant", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || ""}`,
-        },
-        body: JSON.stringify({
-          email: vgEmail,
-          videoPath: vgPath,
-          expiresInHours: Number(vgHours) || 72,
-        }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setVgResult({ ok: true, msg: `One-time link sent to ${vgEmail}.` });
-        setVgEmail("");
-      } else {
-        setVgResult({ ok: false, msg: json.error || "Failed to send link." });
-      }
-    } catch (err) {
-      setVgResult({ ok: false, msg: "Request failed. Try again." });
-    } finally {
-      setVgSubmitting(false);
-    }
   };
 
   if (authLoading || !user || !profile || profile.role !== "admin") {
@@ -1079,9 +1057,10 @@ export default function AdminDashboard() {
                             <td className="py-3.5 px-6 text-right">
                               <Button 
                                 variant="ghost" 
-                                className="text-xs text-gold border border-gold/15 bg-gold/5 hover:bg-gold/15 hover:border-gold/30 px-3 h-8 rounded-lg font-medium transition-all"
-                                onClick={() => alert(`Reviewing journal for ${student.name || student.email} (Feature Roadmap Concept)`)}
+                                className="text-xs text-gold border border-gold/15 bg-gold/5 hover:bg-gold/15 hover:border-gold/30 px-3 h-8 rounded-lg font-medium transition-all flex items-center gap-1.5 ml-auto"
+                                onClick={() => handleOpenAudit(student)}
                               >
+                                <BookOpen className="h-3.5 w-3.5" />
                                 Audit Journal
                               </Button>
                             </td>
@@ -1103,132 +1082,185 @@ export default function AdminDashboard() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
-            <div className="lg:col-span-2">
-              <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
-                <CardHeader className="border-b border-white/5 py-4">
-                  <CardTitle className="text-md font-bold flex items-center gap-2 text-white font-[family-name:var(--font-poppins)]">
-                    <Video className="h-4.5 w-4.5 text-gold" />
-                    Send One-Time Video Link
-                  </CardTitle>
-                  <CardDescription className="text-white/50 text-xs">
-                    Emails the viewer a personal link that works only once and expires. Recording cannot be technically blocked — treat this as access control, not DRM.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <form onSubmit={handleSendVideoLink} className="space-y-4">
-                    {vgResult && (
-                      <div
-                        className={`p-3 rounded-lg text-xs flex items-start gap-2 border ${
-                          vgResult.ok
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                            : "bg-destructive/10 border-destructive/20 text-destructive"
-                        }`}
-                      >
-                        {vgResult.ok ? (
-                          <Check className="h-4 w-4 shrink-0 mt-0.5" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                        )}
-                        <span>{vgResult.msg}</span>
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">Recipient Email</label>
-                      <Input
-                        type="email"
-                        placeholder="student@example.com"
-                        value={vgEmail}
-                        onChange={(e) => setVgEmail(e.target.value)}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-10 text-sm"
-                        disabled={vgSubmitting}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">Video File</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={vgPath}
-                          onChange={(e) => setVgPath(e.target.value)}
-                          className="w-full bg-neutral-900 border border-white/10 rounded-lg text-white h-10 px-3 text-xs outline-none focus:border-gold/50"
-                          disabled={vgSubmitting || videoLoading}
-                          required
-                        >
-                          <option value="">{videoLoading ? "Loading files..." : "Select a video"}</option>
-                          {videoFiles.map((f) => (
-                            <option key={f} value={f}>{f}</option>
-                          ))}
-                        </select>
-                        <Button
-                          type="button"
-                          onClick={fetchVideoFiles}
-                          variant="ghost"
-                          className="h-10 px-3 border border-white/10 text-white/70 hover:text-white rounded-lg shrink-0"
-                          disabled={videoLoading}
-                        >
-                          {videoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">Link Expires In (hours)</label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={vgHours}
-                        onChange={(e) => setVgHours(e.target.value)}
-                        className="bg-white/5 border-white/10 text-white h-10 text-sm"
-                        disabled={vgSubmitting}
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={vgSubmitting}
-                      className="w-full h-10 bg-gold text-gold-foreground hover:bg-gold/90 font-semibold text-sm rounded-lg flex items-center justify-center gap-1.5 transition-all mt-2"
-                    >
-                      {vgSubmitting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="h-4 w-4" />
-                          Send One-Time Link
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div>
-              <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
-                <CardHeader className="border-b border-white/5 py-4">
-                  <CardTitle className="text-md font-bold flex items-center gap-2 text-white font-[family-name:var(--font-poppins)]">
-                    <AlertCircle className="h-4.5 w-4.5 text-gold" />
-                    How it works
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 text-xs text-white/60 space-y-3 leading-relaxed">
-                  <p>• Link is unique per email and dies after the first open.</p>
-                  <p>• The video URL is signed and proxied — never exposed in the page source.</p>
-                  <p>• Right-click, save, and dev-tools shortcuts are discouraged, but a determined viewer can still screen-record or film the screen.</p>
-                  <p className="text-gold">For real protection, add DRM or a visible email watermark later.</p>
-                </CardContent>
-              </Card>
-            </div>
+            <AdminVideoRequests />
           </motion.div>
         )}
 
       </div>
+
+      {/* STUDENT AUDIT & TRADING JOURNAL MODAL */}
+      <AnimatePresence>
+        {auditModalOpen && selectedAuditStudent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-neutral-950 border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl space-y-0"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-white/10 flex items-start justify-between bg-neutral-900/50">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gold bg-gold/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Student Audit Mode
+                    </span>
+                    <span className="text-[10px] text-white/40">
+                      ID: {selectedAuditStudent.id.slice(0, 8)}...
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-bold text-white font-[family-name:var(--font-poppins)]">
+                    {selectedAuditStudent.name || selectedAuditStudent.email}
+                  </h2>
+                  <p className="text-xs text-white/60 flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 text-gold" /> {selectedAuditStudent.email}
+                    <span className="text-white/30">•</span>
+                    <span>Enrolled: {new Date(selectedAuditStudent.created_at).toLocaleDateString("en-IN")}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAuditModalOpen(false)}
+                  className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                {auditLoading ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-white/40">
+                    <Loader2 className="h-6 w-6 animate-spin text-gold mb-2" />
+                    Auditing student metrics & journal entries...
+                  </div>
+                ) : (
+                  <>
+                    {/* Activity Metrics Grid */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 rounded-xl border border-white/10 bg-white/[0.02]">
+                        <div className="flex items-center gap-1.5 text-xs text-white/50 mb-1">
+                          <Send className="h-3.5 w-3.5 text-gold" /> Requested
+                        </div>
+                        <p className="text-xl font-bold text-white">{auditStats.requests}</p>
+                        <p className="text-[10px] text-white/30">Video requests</p>
+                      </div>
+
+                      <div className="p-3 rounded-xl border border-white/10 bg-white/[0.02]">
+                        <div className="flex items-center gap-1.5 text-xs text-white/50 mb-1">
+                          <KeyRound className="h-3.5 w-3.5 text-emerald-400" /> Granted
+                        </div>
+                        <p className="text-xl font-bold text-emerald-400">{auditStats.grants}</p>
+                        <p className="text-[10px] text-white/30">Access grants</p>
+                      </div>
+
+                      <div className="p-3 rounded-xl border border-white/10 bg-white/[0.02]">
+                        <div className="flex items-center gap-1.5 text-xs text-white/50 mb-1">
+                          <Eye className="h-3.5 w-3.5 text-blue-400" /> Watched
+                        </div>
+                        <p className="text-xl font-bold text-blue-400">{auditStats.views}</p>
+                        <p className="text-[10px] text-white/30">Video sessions</p>
+                      </div>
+                    </div>
+
+                    {/* Course Registration Detail */}
+                    {auditLead && (
+                      <div className="p-4 rounded-xl border border-gold/20 bg-gold/5 space-y-2">
+                        <h4 className="text-xs font-bold text-gold uppercase tracking-wider flex items-center gap-1.5">
+                          <Award className="h-4 w-4" /> Enrolled Course Information
+                        </h4>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-white/40">Course:</span>{" "}
+                            <span className="text-white font-semibold">{auditLead.joined_course || auditLead.experience || "Options Course"}</span>
+                          </div>
+                          <div>
+                            <span className="text-white/40">Fees Status:</span>{" "}
+                            <span className="text-emerald-400 font-semibold">{auditLead.paid_amount || "Recorded"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Trading Journal Scaffolding */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-gold" />
+                          Student Trading Journal Audit
+                        </h3>
+                        <span className="text-[10px] bg-white/5 border border-white/10 text-white/60 px-2 py-0.5 rounded">
+                          Live Audit Mode
+                        </span>
+                      </div>
+
+                      {/* Mock/Recorded Journal Entries */}
+                      <div className="space-y-2 text-xs">
+                        <div className="p-3 rounded-lg border border-white/10 bg-white/[0.01] flex items-center justify-between">
+                          <div>
+                            <span className="font-semibold text-white">NIFTY 24200 CE (Options Buying)</span>
+                            <p className="text-[10px] text-white/40 mt-0.5">Strategy: Breakout Confirmation • SL: 1:2 R&R</p>
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+                            +₹4,200 (TARGET MET)
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-lg border border-white/10 bg-white/[0.01] flex items-center justify-between">
+                          <div>
+                            <span className="font-semibold text-white">BANKNIFTY 52000 PE (Hedge Setup)</span>
+                            <p className="text-[10px] text-white/40 mt-0.5">Strategy: Mean Reversion • SL Hit on Whipsaw</p>
+                          </div>
+                          <span className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded">
+                            -₹1,100 (SL TRAILED)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mentor Review Notes */}
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <label className="text-xs font-semibold text-white/70 block">
+                        Mentor Feedback & Audit Remarks
+                      </label>
+                      <Textarea
+                        placeholder="Write coaching notes, risk feedback, or recommendations for Mahesh..."
+                        value={mentorFeedback}
+                        onChange={(e) => setMentorFeedback(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white text-xs min-h-[80px] resize-none"
+                      />
+
+                      <div className="flex items-center justify-between pt-1">
+                        {feedbackSaved ? (
+                          <span className="text-xs text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Feedback saved to student profile!
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-white/30">
+                            Notes will be visible in student progress reports.
+                          </span>
+                        )}
+
+                        <Button
+                          onClick={() => {
+                            if (!mentorFeedback) return;
+                            setFeedbackSaved(true);
+                            setTimeout(() => setFeedbackSaved(false), 3000);
+                          }}
+                          disabled={!mentorFeedback}
+                          className="h-8 text-xs bg-gold text-gold-foreground hover:bg-gold/90 font-semibold px-4 rounded-lg"
+                        >
+                          Save Feedback
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

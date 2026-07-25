@@ -22,6 +22,7 @@ import {
   Loader2 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import VideoLibrary from "@/components/VideoLibrary";
 
 interface EventItem {
   id: string;
@@ -339,9 +340,12 @@ export default function StudentDashboard() {
             </Card>
           </div>
 
-          {/* Column 3: Resources & Social links */}
+          {/* Column 3: Video library, Resources & Social links */}
           <div className="space-y-8">
-            
+
+            {/* Video Library — request & watch recorded sessions */}
+            <VideoLibrary />
+
             {/* Resources Section */}
             <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
               <CardHeader className="border-b border-white/5 py-4">
