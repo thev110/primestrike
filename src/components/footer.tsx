@@ -11,17 +11,11 @@ import {
   FOUNDER_NAME,
 } from "@/lib/constants";
 
-const resourceLinks = [
-  { label: "Blog", href: "/blog" },
-  { label: "Events", href: "/events" },
-  { label: "Services", href: "/services" },
-];
-
 export function Footer() {
   return (
     <footer className="bg-foreground text-background">
       <div className="mx-auto max-w-7xl px-6 py-16 md:py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {/* Brand */}
           <div>
             <h3 className="text-xl font-bold font-[family-name:var(--font-poppins)] mb-4">
@@ -60,25 +54,6 @@ export function Footer() {
             <ul className="space-y-3">
               {NAV_LINKS.map((link) => (
                 <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-background/60 hover:text-background transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Resources */}
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-wider mb-4 text-background/80">
-              Resources
-            </h4>
-            <ul className="space-y-3">
-              {resourceLinks.map((link) => (
-                <li key={link.label}>
                   <Link
                     href={link.href}
                     className="text-sm text-background/60 hover:text-background transition-colors"

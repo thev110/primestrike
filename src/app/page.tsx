@@ -90,7 +90,7 @@ export default function HomePage() {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <Link href="/events" style={{ color: 'inherit' }}>Explore Webinars</Link>
+                <Link href="/services" style={{ color: 'inherit' }}>Explore Courses</Link>
               </Button>
             </div>
           </AnimatedSection>
@@ -204,8 +204,8 @@ export default function HomePage() {
                 variant="outline"
                 className="border-white/20 text-white hover:bg-white hover:text-black hover:border-white rounded-full px-8 group transition-all duration-300"
               >
-                <Link href="/events">
-                  View Our Webinars
+                <Link href="/services">
+                  Explore Courses
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>

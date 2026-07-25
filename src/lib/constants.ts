@@ -65,8 +65,6 @@ export const FOUNDER_NAME = "Saranya";
 export const NAV_LINKS: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "Services", href: "/services" },
-  { label: "Events", href: "/events" },
-  { label: "Blog", href: "/blog" },
   { label: "Contact", href: "/contact" },
 ];
 
