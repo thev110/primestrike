@@ -15,7 +15,6 @@ import {
   TESTIMONIALS,
   HOMEPAGE_PROCESS,
   EST_YEAR,
-  FOUNDER_NAME,
 } from "@/lib/constants";
 
 const serviceImages = [
@@ -293,50 +292,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════
-          LEADERSHIP
-          ══════════════════════════════════════════════════ */}
-      <section className="py-32 md:py-40 bg-neutral-950 text-white">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center max-w-xl mx-auto mb-20">
-            <p className="text-xs uppercase tracking-[0.3em] text-gold/50 mb-4 font-[family-name:var(--font-poppins)]">
-              Academy Founder
-            </p>
-            <h2 className="text-4xl md:text-5xl font-bold font-[family-name:var(--font-poppins)] tracking-tight">
-              Meet our Mentor
-            </h2>
-          </div>
-
-          <div className="max-w-3xl mx-auto">
-            {/* Saranya - Founder */}
-            <AnimatedSection>
-              <div className="group relative flex flex-col md:flex-row items-center gap-12">
-                <div className="relative w-64 h-80 overflow-hidden rounded-2xl border border-white/5 transition-all duration-500 group-hover:border-gold/20 flex-shrink-0">
-                  <Image
-                    src="/images/saranya.jpg"
-                    alt="Saranya - Founder & Mentor of Prime Strike"
-                    fill
-                    className="object-cover transition-all duration-700"
-                    sizes="(max-width: 768px) 100vw, 30vw"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/90 to-transparent">
-                    <p className="text-xs font-semibold text-gold tracking-widest uppercase mb-1">Founder & Mentor</p>
-                    <h3 className="text-2xl font-bold font-[family-name:var(--font-poppins)] tracking-tight">Saranya</h3>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-white/40 leading-relaxed mb-6 text-base">
-                    With over eight years of active trading experience, Saranya founded Prime Strike to offer structured, rule-based trading education. Through interactive online webinars and direct journal feedback, she helps retail traders master options hedging and price action analysis.
-                  </p>
-                  <Link href="/saranya" className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-gold/60 hover:text-gold transition-colors font-semibold group/link">
-                    View Mentor Profile <ArrowRight className="w-3 h-3 group-hover/link:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              </div>
-            </AnimatedSection>
-          </div>
-        </div>
-      </section>
 
       {/* ══════════════════════════════════════════════════
           CTA
