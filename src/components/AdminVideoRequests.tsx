@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Video, Loader2, Check, X, Clock, RefreshCw, Plus, EyeOff, Eye, Send, KeyRound,
+  Video, Loader2, Check, X, Clock, RefreshCw, Plus, EyeOff, Eye, Send, KeyRound, UploadCloud,
 } from "lucide-react";
 
 interface ReqRow {
@@ -44,6 +44,8 @@ export default function AdminVideoRequests() {
   const [newDesc, setNewDesc] = useState("");
   const [newPath, setNewPath] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -101,25 +103,59 @@ export default function AdminVideoRequests() {
   };
 
   const publish = async () => {
-    if (!newTitle || !newPath) return;
+    if (!newTitle) return;
+
     try {
       setPublishing(true);
+      setError("");
+
+      let storagePathToUse = newPath;
+
+      // If user selected a file from device, upload it to bucket first
+      if (uploadFile) {
+        setUploading(true);
+        const fileName = `${Date.now()}_${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: upErr } = await supabase.storage
+          .from("videos")
+          .upload(fileName, uploadFile);
+
+        if (upErr) {
+          setError(`File upload failed: ${upErr.message}`);
+          setPublishing(false);
+          setUploading(false);
+          return;
+        }
+        storagePathToUse = fileName;
+      }
+
+      if (!storagePathToUse) {
+        setError("Please select a file to publish.");
+        setPublishing(false);
+        setUploading(false);
+        return;
+      }
+
       const res = await fetch("/api/admin/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: newPath }),
+        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: storagePathToUse }),
       });
+
       if (res.ok) {
-        setNewTitle(""); setNewDesc(""); setNewPath("");
+        setNewTitle("");
+        setNewDesc("");
+        setNewPath("");
+        setUploadFile(null);
         await load();
       } else {
         const j = await res.json().catch(() => ({}));
         setError(j.error || "Publish failed.");
       }
     } catch {
-      setError("Network error.");
+      setError("Network error publishing video.");
     } finally {
       setPublishing(false);
+      setUploading(false);
     }
   };
 
@@ -312,26 +348,81 @@ export default function AdminVideoRequests() {
                 onChange={(e) => setNewDesc(e.target.value)}
                 className="bg-white/5 border-white/10 text-white h-10 text-sm"
               />
-              <select
-                value={newPath}
-                onChange={(e) => setNewPath(e.target.value)}
-                className="w-full bg-neutral-900 border border-white/10 rounded-lg text-white h-10 px-3 text-xs outline-none focus:border-gold/50"
-              >
-                <option value="">Select bucket file…</option>
-                {unlinked.map((f) => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </select>
+
+              {/* Computer Device File Upload Option */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gold uppercase tracking-wider block">
+                  Option 1: Upload Video from Computer
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    id="device-video-file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setUploadFile(f);
+                      if (f && !newTitle) {
+                        setNewTitle(f.name.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="device-video-file"
+                    className="w-full flex items-center justify-center gap-2 bg-white/5 border border-dashed border-white/20 hover:border-gold/50 text-white/80 hover:text-white rounded-lg h-11 px-3 text-xs cursor-pointer transition-all"
+                  >
+                    <UploadCloud className="h-4 w-4 text-gold shrink-0" />
+                    <span className="truncate">
+                      {uploadFile ? uploadFile.name : "Choose video file (.mp4, .mov)..."}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Select existing bucket file Option */}
+              {unlinked.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider block">
+                    Option 2: Or select existing bucket file
+                  </label>
+                  <select
+                    value={newPath}
+                    onChange={(e) => {
+                      setNewPath(e.target.value);
+                      setUploadFile(null);
+                    }}
+                    className="w-full bg-neutral-900 border border-white/10 rounded-lg text-white h-10 px-3 text-xs outline-none focus:border-gold/50"
+                  >
+                    <option value="">Select bucket file…</option>
+                    {unlinked.map((f) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <Button
                 onClick={publish}
-                disabled={publishing || !newTitle || !newPath}
-                className="w-full h-10 bg-gold text-gold-foreground hover:bg-gold/90 font-semibold text-sm rounded-lg flex items-center justify-center gap-1.5"
+                disabled={publishing || uploading || !newTitle || (!uploadFile && !newPath)}
+                className="w-full h-10 bg-gold text-gold-foreground hover:bg-gold/90 font-semibold text-sm rounded-lg flex items-center justify-center gap-1.5 mt-2"
               >
-                {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Publish
+                {publishing || uploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {uploading ? "Uploading file..." : "Publishing..."}
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Upload & Publish Video
+                  </>
+                )}
               </Button>
-              {unlinked.length === 0 && (
-                <p className="text-[11px] text-white/30">All bucket files are already published.</p>
+              {unlinked.length === 0 && !uploadFile && (
+                <p className="text-[11px] text-white/40 text-center">
+                  Select a video file from your computer above to publish.
+                </p>
               )}
             </CardContent>
           </Card>
