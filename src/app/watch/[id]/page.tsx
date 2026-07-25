@@ -96,9 +96,10 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
     return () => clearInterval(iv);
   }, [expiresAt]);
 
-  // Anti-capture deterrents (raise effort; cannot stop a phone camera).
+  // Anti-capture deterrents & strict focus guards.
   useEffect(() => {
     if (state !== "ready") return;
+
     const blockKeys = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (
@@ -109,19 +110,37 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
         e.preventDefault();
       }
     };
+
     const blockCtx = (e: MouseEvent) => e.preventDefault();
+
+    const handleWindowBlur = () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+      setPaused(true);
+    };
+
+    const handleWindowFocus = () => {
+      setPaused(false);
+    };
+
     const onVisibility = () => {
       if (document.hidden) {
-        videoRef.current?.pause();
-        setPaused(true);
+        handleWindowBlur();
       } else {
-        setPaused(false);
+        handleWindowFocus();
       }
     };
+
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
     document.addEventListener("keydown", blockKeys);
     document.addEventListener("contextmenu", blockCtx);
     document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("keydown", blockKeys);
       document.removeEventListener("contextmenu", blockCtx);
       document.removeEventListener("visibilitychange", onVisibility);
@@ -178,16 +197,24 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             className="w-full bg-black"
           />
 
-          {/* Moving watermark: student email burned over the frame. */}
+          {/* Dual dynamic watermarks: student email burned across the video frame */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="watermark-drift absolute whitespace-nowrap text-white/20 text-sm font-mono">
-              {watermark} · Prime Strike
+            <div className="watermark-drift-1 absolute whitespace-nowrap text-white/25 text-xs font-mono select-none drop-shadow-md">
+              {watermark} · Prime Strike Protected
+            </div>
+            <div className="watermark-drift-2 absolute whitespace-nowrap text-gold/30 text-xs font-mono select-none drop-shadow-md">
+              {watermark} · Confidential Stream
             </div>
           </div>
 
+          {/* Screen recording / window blur protection overlay */}
           {paused && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/95 text-neutral-300 text-sm">
-              Playback paused — return to this tab to continue.
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/98 text-center p-6 space-y-3 z-30">
+              <ShieldAlert className="h-10 w-10 text-gold animate-bounce" />
+              <h3 className="text-lg font-bold text-white">Screen Protection Active</h3>
+              <p className="text-xs text-neutral-400 max-w-md">
+                Playback paused. Switch focus back to this browser window to resume watching. External screen recording, screenshotting, or sharing is strictly prohibited and tracked to <strong className="text-gold">{watermark}</strong>.
+              </p>
             </div>
           )}
         </div>
@@ -198,17 +225,28 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
       </div>
 
       <style jsx>{`
-        .watermark-drift {
+        .watermark-drift-1 {
           top: 10%;
           left: 10%;
-          animation: drift 17s linear infinite alternate;
+          animation: drift1 19s linear infinite alternate;
         }
-        @keyframes drift {
+        .watermark-drift-2 {
+          bottom: 15%;
+          right: 10%;
+          animation: drift2 23s linear infinite alternate;
+        }
+        @keyframes drift1 {
           0% { top: 8%; left: 6%; }
-          25% { top: 70%; left: 60%; }
-          50% { top: 40%; left: 20%; }
-          75% { top: 80%; left: 75%; }
-          100% { top: 15%; left: 50%; }
+          25% { top: 75%; left: 65%; }
+          50% { top: 35%; left: 15%; }
+          75% { top: 82%; left: 80%; }
+          100% { top: 12%; left: 45%; }
+        }
+        @keyframes drift2 {
+          0% { bottom: 10%; right: 8%; }
+          30% { bottom: 80%; right: 70%; }
+          60% { bottom: 25%; right: 30%; }
+          100% { bottom: 85%; right: 15%; }
         }
       `}</style>
     </div>
