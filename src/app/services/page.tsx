@@ -4,10 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Check, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AnimatedSection } from "@/components/animated-section";
-import { PRICING_TIERS } from "@/lib/constants";
 
 const categories = [
   { title: "Stock Trading", image: "/images/cat-corporate.png", alt: "Stock market basics coaching" },
@@ -298,76 +295,6 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════
-          PRICING
-          ══════════════════════════════════════════════════ */}
-      <section className="py-28 bg-neutral-950">
-        <div className="mx-auto max-w-7xl px-6">
-          <AnimatedSection>
-            <div className="text-center max-w-xl mx-auto mb-16">
-              <p className="text-xs uppercase tracking-[0.3em] text-gold/50 mb-4 font-[family-name:var(--font-poppins)]">
-                Packages
-              </p>
-              <h2 className="text-4xl md:text-5xl font-bold text-white font-[family-name:var(--font-poppins)] tracking-tight">
-                Mentorship Packages
-              </h2>
-            </div>
-          </AnimatedSection>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PRICING_TIERS.map((tier, i) => (
-              <AnimatedSection key={tier.name} delay={i * 0.06}>
-                <Card
-                  className={`h-full border transition-all duration-500 hover:-translate-y-1 ${
-                    tier.highlight
-                      ? "bg-gold/[0.06] border-gold/[0.2] shadow-lg shadow-gold/[0.03]"
-                      : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <CardHeader className="pb-4 p-8">
-                    {tier.highlight && (
-                      <Badge variant="secondary" className="w-fit mb-4 bg-gold/15 text-gold border-0 text-[10px] uppercase tracking-widest">
-                        Most Popular
-                      </Badge>
-                    )}
-                    <CardTitle className="text-white font-[family-name:var(--font-poppins)] text-xl tracking-tight">
-                      {tier.name}
-                    </CardTitle>
-                    <div className="mt-4">
-                      <span className="text-4xl font-bold text-white font-[family-name:var(--font-poppins)]">
-                        {tier.price}
-                      </span>
-                      {tier.price !== "Custom" && (
-                        <span className="text-sm text-white/30 ml-2">/ event</span>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-8 pt-0">
-                    <ul className="space-y-3 mb-8">
-                      {tier.features.map((f) => (
-                        <li key={f} className="flex items-start gap-3 text-sm text-white/40">
-                          <Check className="h-4 w-4 text-gold/40 mt-0.5 flex-shrink-0" />
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      asChild
-                      className={`w-full rounded-full ${
-                        tier.highlight
-                          ? "bg-gold text-gold-foreground hover:bg-gold/90"
-                          : "bg-white/[0.06] text-white hover:bg-white/[0.1] border border-white/[0.08]"
-                      }`}
-                    >
-                      <Link href="/contact">Get Started</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </AnimatedSection>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ══════════════════════════════════════════════════
           FINAL CTA
