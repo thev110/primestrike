@@ -21,11 +21,8 @@ export function Footer() {
             <h3 className="text-xl font-bold font-[family-name:var(--font-poppins)] mb-4">
               {SITE_NAME}
             </h3>
-            <p className="text-sm text-background/60 leading-relaxed mb-2">
+            <p className="text-sm text-background/60 leading-relaxed mb-6">
               Premium stock market and options trading academy in Chennai by {FOUNDER_NAME}.
-            </p>
-            <p className="text-sm text-background/40 leading-relaxed mb-6">
-              Learn options hedging, price action, and systematic trading to build confidence.
             </p>
             <div className="flex gap-3">
               {SOCIAL_LINKS.map(({ label, href }: { label: string; href: string }) => {
