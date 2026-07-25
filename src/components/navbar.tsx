@@ -190,6 +190,7 @@ export function Navbar() {
                         }}
                       >
                         <SheetClose
+                          nativeButton={false}
                           render={
                             <Link
                               href={link.href}
@@ -218,6 +219,7 @@ export function Navbar() {
                       }}
                     >
                       <SheetClose
+                        nativeButton={false}
                         render={
                           <Link
                             href={profile?.role === "admin" ? "/admin" : "/dashboard"}
@@ -258,6 +260,7 @@ export function Navbar() {
                   ) : (
                     <>
                       <SheetClose
+                        nativeButton={false}
                         render={
                           <Button
                             asChild
@@ -272,6 +275,7 @@ export function Navbar() {
                       />
                       <div className="grid grid-cols-2 gap-3">
                         <SheetClose
+                          nativeButton={false}
                           render={
                             <Button
                               asChild
@@ -283,6 +287,7 @@ export function Navbar() {
                           }
                         />
                         <SheetClose
+                          nativeButton={false}
                           render={
                             <Button
                               asChild
