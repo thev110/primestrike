@@ -109,36 +109,43 @@ export default function AdminVideoRequests() {
       setPublishing(true);
       setError("");
 
-      let storagePathToUse = newPath;
-
-      // If user selected a file from device, upload it to bucket first
+      // Option 1: Direct file upload from computer via server route
       if (uploadFile) {
         setUploading(true);
-        const fileName = `${Date.now()}_${uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-        const { error: upErr } = await supabase.storage
-          .from("videos")
-          .upload(fileName, uploadFile);
+        const fd = new FormData();
+        fd.append("file", uploadFile);
+        fd.append("title", newTitle);
+        fd.append("description", newDesc);
 
-        if (upErr) {
-          setError(`File upload failed: ${upErr.message}`);
-          setPublishing(false);
-          setUploading(false);
-          return;
+        const res = await fetch("/api/admin/videos/upload", {
+          method: "POST",
+          headers: await authHeader(),
+          body: fd,
+        });
+
+        if (res.ok) {
+          setNewTitle("");
+          setNewDesc("");
+          setNewPath("");
+          setUploadFile(null);
+          await load();
+        } else {
+          const j = await res.json().catch(() => ({}));
+          setError(j.error || "Server upload failed.");
         }
-        storagePathToUse = fileName;
+        return;
       }
 
-      if (!storagePathToUse) {
-        setError("Please select a file to publish.");
-        setPublishing(false);
-        setUploading(false);
+      // Option 2: Existing bucket file selection
+      if (!newPath) {
+        setError("Please choose a video file or select a bucket file.");
         return;
       }
 
       const res = await fetch("/api/admin/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: storagePathToUse }),
+        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: newPath }),
       });
 
       if (res.ok) {

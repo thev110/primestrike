@@ -24,12 +24,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: cErr.message }, { status: 500 });
     }
 
-    const { data: objects, error: oErr } = await supabaseAdmin.storage
+    let objects = null;
+    const { data: listData, error: oErr } = await supabaseAdmin.storage
       .from(VIDEO_BUCKET)
       .list("", { limit: 200, sortBy: { column: "name", order: "asc" } });
 
     if (oErr) {
-      return NextResponse.json({ error: oErr.message }, { status: 500 });
+      // Auto-create bucket if missing
+      await supabaseAdmin.storage.createBucket(VIDEO_BUCKET, { public: false }).catch(() => null);
+    } else {
+      objects = listData;
     }
 
     const used = new Set((catalog || []).map((v) => v.storage_path));
