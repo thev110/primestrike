@@ -89,14 +89,14 @@ export function Footer() {
             </ul>
 
             <h4 className="text-sm font-semibold uppercase tracking-wider mt-6 mb-3 text-background/80">
-              Offices
+              Address
             </h4>
             <ul className="space-y-2 text-sm text-background/60">
               {OFFICES.map((office) => (
                 <li key={office.city} className="flex items-start gap-2">
                   <MapPin className="h-3 w-3 shrink-0 mt-1" />
                   <span>
-                    {office.city} — {office.detail}
+                    {office.detail}
                   </span>
                 </li>
               ))}

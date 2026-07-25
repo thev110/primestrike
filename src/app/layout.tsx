@@ -46,6 +46,14 @@ export const metadata: Metadata = {
       "Learn stock trading from Saranya in Chennai.",
     images: ["/images/services-hero.png"],
   },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({

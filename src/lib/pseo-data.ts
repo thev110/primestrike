@@ -227,27 +227,27 @@ export const PSEO_PAGES: PseoPage[] = [
     title: "Share Market Classes in Nungambakkam, Chennai | Prime Strike",
     h1: "Share Market Classes in Nungambakkam",
     metaDescription:
-      "Learn share trading in Nungambakkam. Prime Strike offers stock market classes and mentorship at our Jagannathan Street office.",
+      "Learn share trading in Alandur, Chennai. Prime Strike offers stock market classes and mentorship at our Alandur office.",
     intro:
-      "Looking for structured stock market coaching in Nungambakkam? Our primary office is at No. 10, Jagannathan Street. We conduct interactive webinars online and host in-person weekend meetups for student portfolio reviews and strategy discussions right here in central Chennai.",
+      "Looking for structured stock market coaching in Chennai? Our office is at No 519 Mkn road Alandur Chennai 600016. We conduct interactive webinars online and host in-person weekend meetups for student portfolio reviews and strategy discussions.",
     whatWeOffer: [
       "Interactive webinars on stock market basics",
-      "In-person weekend mentorship at Nungambakkam",
+      "In-person weekend mentorship at Alandur",
       "Option strategy workshops and trading setups",
       "Practical exercises in chart analysis",
       "Face-to-face feedback on your trade logs",
     ],
     whyChooseUs:
-      "Our central location makes it easy to meet in person. If you are stuck with a trading concept or want your trade journal audited, you can schedule an appointment at our Nungambakkam office.",
+      "Our location makes it easy to meet in person. If you are stuck with a trading concept or want your trade journal audited, you can schedule an appointment at our Alandur office.",
     popularVenues: [
-      "Nungambakkam Office Meeting Rooms",
+      "Alandur Office Meeting Rooms",
       "Live Webinar Broadcast System",
       "Central Chennai Trading Meetups",
     ],
     faqs: [
       {
-        q: "Where is your office in Nungambakkam located?",
-        a: "We are at No. 10, Jagannathan Street, Nungambakkam, Chennai. You can drop in for weekend portfolio reviews by booking an appointment at +91 98842 20242.",
+        q: "Where is your office located?",
+        a: "We are at No 519 Mkn road Alandur Chennai 600016. You can drop in for weekend portfolio reviews by booking an appointment at +91 95002 98631.",
       },
       {
         q: "Do you teach share market classes in Tamil?",

@@ -89,10 +89,10 @@ function LocalBusinessSchema({ page }: { page: ReturnType<typeof getPseoPage> })
     telephone: SITE_PHONE,
     address: {
       "@type": "PostalAddress",
-      streetAddress: "No. 10, Jagannathan Street",
-      addressLocality: "Nungambakkam",
+      streetAddress: "No 519 Mkn road",
+      addressLocality: "Alandur",
       addressRegion: "Tamil Nadu",
-      postalCode: "600034",
+      postalCode: "600016",
       addressCountry: "IN",
     },
     areaServed: {

@@ -53,7 +53,7 @@ All site copy, navigation links, testimonials, events, blog posts, pricing tiers
 - **Company**: City Heights Events, Chennai, Tamil Nadu
 - **Founder**: Jabes Amirtharaj (event manager + car sales background)
 - **Services**: Weddings, corporate events, concerts, festivals
-- **Offices**: Nungambakkam & Kolathur, Chennai
+- **Office**: No 519 Mkn road Alandur Chennai 600016
 - **Pricing**: INR (₹50k Essential, ₹2L Premium, Custom Elite)
 
 ## Current State

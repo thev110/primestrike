@@ -58,19 +58,19 @@ export default function ContactPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
 
-            {/* Left: Our Offices */}
+            {/* Left: Our Address */}
             <AnimatedSection>
               <div className="space-y-16">
                 <div>
                   <h2 className="text-4xl font-bold text-white font-[family-name:var(--font-poppins)] tracking-tight mb-6">
-                    Our Offices
+                    Our Address
                   </h2>
                   <p className="text-white/40 leading-relaxed max-w-md">
-                    Based in Chennai with two centers strategically located for trading mentoring and weekend portfolio reviews.
+                    Based in Chennai for trading mentoring and weekend portfolio reviews.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 gap-10">
                   {OFFICES.map((office) => (
                     <div key={office.city} className="space-y-3">
                       <div className="flex items-center gap-3">

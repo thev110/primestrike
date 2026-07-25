@@ -70,8 +70,7 @@ export const NAV_LINKS: NavLink[] = [
 
 // ─── Offices ─────────────────────────────────────────────
 export const OFFICES: Office[] = [
-  { city: "Nungambakkam Office", detail: "No. 10, Jagannathan Street, Nungambakkam, Chennai" },
-  { city: "Kolathur Center", detail: "Water Canal Road, Kolathur, Chennai" },
+  { city: "Alandur Office", detail: "No 519 Mkn road Alandur Chennai 600016" },
 ];
 
 // ─── Social links ────────────────────────────────────────
