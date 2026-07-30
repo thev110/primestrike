@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoLibrary from "@/components/VideoLibrary";
+import HomeworkUpload from "@/components/HomeworkUpload";
 
 interface EventItem {
   id: string;
@@ -41,6 +42,7 @@ export default function StudentDashboard() {
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [fetchingEvents, setFetchingEvents] = useState(true);
+  const [homeworkSubmittedDates, setHomeworkSubmittedDates] = useState<string[]>([]);
   
   // Calendar Navigation State
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -81,9 +83,29 @@ export default function StudentDashboard() {
     }
   };
 
+  // Fetch homework submitted dates for calendar indicators
+  const fetchHomeworkSubmittedDates = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from("homework_submissions")
+        .select("submission_date")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error fetching homework dates:", error);
+      } else if (data) {
+        setHomeworkSubmittedDates(data.map((row) => row.submission_date));
+      }
+    } catch (err) {
+      console.error("Homework dates exception:", err);
+    }
+  };
+
   useEffect(() => {
     if (user && profile?.role === "student") {
       fetchEvents();
+      fetchHomeworkSubmittedDates();
     }
   }, [user, profile]);
 
@@ -136,6 +158,12 @@ export default function StudentDashboard() {
     return events.some((e) => e.date === formattedDate);
   };
 
+  // Helper to check if homework was submitted on date
+  const hasHomeworkOnDate = (date: Date) => {
+    const formattedDate = date.toISOString().split("T")[0];
+    return homeworkSubmittedDates.includes(formattedDate);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 md:px-8 relative overflow-hidden">
       {/* Background ambient glows */}
@@ -159,7 +187,7 @@ export default function StudentDashboard() {
               Hello, {profile.name || "Trader"}
             </h1>
             <p className="text-white/60 text-sm max-w-xl">
-              Access your webinars, review resources, and check upcoming sessions on the calendar. Keep trading with discipline!
+              Upload your daily homework by clicking calendar dates, access your webinars, and review study materials.
             </p>
           </div>
         </motion.div>
@@ -167,17 +195,17 @@ export default function StudentDashboard() {
         {/* Dashboard Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Column 1 & 2: Calendar Portal */}
+          {/* Column 1 & 2: Calendar Portal & Homework */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-white/5">
                 <div>
                   <CardTitle className="text-lg font-bold flex items-center gap-2 text-white font-[family-name:var(--font-poppins)]">
                     <CalendarIcon className="h-5 w-5 text-gold" />
-                    Webinar Calendar
+                    Student Calendar & Homework Portal
                   </CardTitle>
                   <CardDescription className="text-white/50 text-xs">
-                    Select gold-dotted days to access upcoming webinars
+                    Click any calendar day to upload homework or check webinars
                   </CardDescription>
                 </div>
                 
@@ -230,6 +258,7 @@ export default function StudentDashboard() {
                         const dayNum = cellDate.getDate();
                         const isSelected = selectedDate.toDateString() === cellDate.toDateString();
                         const hasEvents = hasEventOnDate(cellDate);
+                        const hasHomework = hasHomeworkOnDate(cellDate);
                         
                         // Check if it is "today"
                         const isToday = new Date().toDateString() === cellDate.toDateString();
@@ -248,20 +277,48 @@ export default function StudentDashboard() {
                           >
                             <span className="text-sm">{dayNum}</span>
                             
-                            {/* Gold dot event indicator */}
-                            {hasEvents && (
-                              <span className={`absolute bottom-1.5 w-1.5 h-1.5 rounded-full ${
-                                isSelected ? "bg-black" : "bg-gold animate-pulse"
-                              }`} />
-                            )}
+                            {/* Dot indicators */}
+                            <div className="absolute bottom-1.5 flex items-center gap-1">
+                              {hasEvents && (
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  isSelected ? "bg-black" : "bg-gold animate-pulse"
+                                }`} />
+                              )}
+                              {hasHomework && (
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  isSelected ? "bg-black" : "bg-emerald-400"
+                                }`} />
+                              )}
+                            </div>
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Indicator Legend */}
+                    <div className="flex items-center justify-end gap-5 text-[11px] text-white/50 pt-2 border-t border-white/5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-gold" />
+                        <span>Webinar Event</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        <span>Homework Uploaded</span>
+                      </div>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Homework Upload Card Component */}
+            <HomeworkUpload
+              selectedDate={selectedDate}
+              userId={user.id}
+              userEmail={user.email || profile.email}
+              userName={profile.name}
+              onSubmissionChange={fetchHomeworkSubmittedDates}
+            />
 
             {/* Selected day webinars display panel */}
             <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">

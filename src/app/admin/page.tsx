@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AdminVideoRequests from "@/components/AdminVideoRequests";
+import AdminHomeworkSubmissions from "@/components/AdminHomeworkSubmissions";
 
 interface EventItem {
   id: string;
@@ -80,7 +81,7 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos">("events");
+  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos" | "homework">("events");
 
   // Data States
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -525,6 +526,17 @@ export default function AdminDashboard() {
           >
             <Video className="h-4 w-4" />
             Video Access Links
+          </button>
+          <button
+            onClick={() => setActiveTab("homework")}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-all px-2 flex items-center gap-2 ${
+              activeTab === "homework"
+                ? "border-gold text-gold"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Daily Homework Submissions
           </button>
         </div>
 
@@ -1084,6 +1096,16 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
           >
             <AdminVideoRequests />
+          </motion.div>
+        )}
+
+        {/* TAB 5: DAILY HOMEWORK SUBMISSIONS */}
+        {activeTab === "homework" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AdminHomeworkSubmissions />
           </motion.div>
         )}
 
