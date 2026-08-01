@@ -54,8 +54,44 @@ export async function POST(request: Request) {
       );
     }
 
-    // Consume a view atomically: only succeeds while still under the cap, so
-    // two tabs opened together cannot both slip through.
+    const { data: video, error: vErr } = await supabaseAdmin
+      .from("videos")
+      .select("storage_path, title, bunny_video_id")
+      .eq("id", videoId)
+      .single();
+
+    if (vErr || !video) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    // Build the playback URL BEFORE charging a view. Minting can fail (missing
+    // Bunny config, storage error), and a student must never lose one of their
+    // limited views to an attempt that never produced a playable video.
+    let playback: { source: "bunny"; embedUrl: string } | { source: "supabase"; signedUrl: string };
+
+    if (video.bunny_video_id) {
+      // Preferred path: signed Bunny embed, streamed straight from the CDN.
+      try {
+        playback = { source: "bunny", embedUrl: signedEmbedUrl(video.bunny_video_id) };
+      } catch (err) {
+        console.error("signedEmbedUrl failed:", err);
+        return NextResponse.json({ error: "sign" }, { status: 500 });
+      }
+    } else {
+      // Legacy path: proxy the private Supabase object behind an httpOnly cookie.
+      const { data: signed, error: signErr } = await supabaseAdmin.storage
+        .from(VIDEO_BUCKET)
+        .createSignedUrl(video.storage_path, 600);
+
+      if (signErr || !signed?.signedUrl) {
+        console.error("createSignedUrl failed:", signErr);
+        return NextResponse.json({ error: "sign" }, { status: 500 });
+      }
+      playback = { source: "supabase", signedUrl: signed.signedUrl };
+    }
+
+    // Playback is guaranteed available, so now consume a view atomically. The
+    // view_count guard means two tabs opened together cannot both slip through.
     const { data: consumed, error: cErr } = await supabaseAdmin
       .from("video_requests")
       .update({ view_count: used + 1 })
@@ -68,25 +104,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "view_limit", used, cap }, { status: 403 });
     }
 
-    const { data: video, error: vErr } = await supabaseAdmin
-      .from("videos")
-      .select("storage_path, title, bunny_video_id")
-      .eq("id", videoId)
-      .single();
-
-    if (vErr || !video) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
-    }
-
     const viewsLeft = cap - consumed.view_count;
 
-    // Preferred path: signed Bunny embed, streamed straight from the CDN.
-    if (video.bunny_video_id) {
+    if (playback.source === "bunny") {
       return NextResponse.json(
         {
           ok: true,
           source: "bunny",
-          embedUrl: signedEmbedUrl(video.bunny_video_id),
+          embedUrl: playback.embedUrl,
           title: video.title,
           watermark: user.email,
           expiresAt: grant.expires_at,
@@ -95,16 +120,6 @@ export async function POST(request: Request) {
         },
         { status: 200 }
       );
-    }
-
-    // Legacy path: proxy the private Supabase object behind an httpOnly cookie.
-    const { data: signed, error: signErr } = await supabaseAdmin.storage
-      .from(VIDEO_BUCKET)
-      .createSignedUrl(video.storage_path, 600);
-
-    if (signErr || !signed?.signedUrl) {
-      console.error("createSignedUrl failed:", signErr);
-      return NextResponse.json({ error: "sign" }, { status: 500 });
     }
 
     const res = NextResponse.json(
@@ -120,7 +135,7 @@ export async function POST(request: Request) {
       { status: 200 }
     );
     // httpOnly so client JS can never read/copy the signed URL. Short max-age.
-    res.cookies.set("vid_src", signed.signedUrl, {
+    res.cookies.set("vid_src", playback.signedUrl, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

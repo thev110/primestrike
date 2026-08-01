@@ -22,6 +22,8 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const videoRef = useRef<HTMLVideoElement>(null);
   const bunnyFrameRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  // Guards the view-consuming session POST against duplicate effect runs.
+  const sessionStartedFor = useRef<string | null>(null);
 
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [errMsg, setErrMsg] = useState("");
@@ -40,8 +42,18 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   }, [authLoading, user, router]);
 
   // Open the playback session once we know who the user is.
+  //
+  // This POST consumes one of the student's limited views, so it must fire
+  // exactly once per mount. A plain `cancelled` flag is not enough: it only
+  // suppresses the state update, while the request has already been sent and
+  // the view already charged. React re-runs effects on Strict Mode double
+  // mounts and whenever the auth object identity changes, either of which
+  // would silently burn a second view for a single click. The ref guard is
+  // keyed by video id so it survives those re-runs.
   useEffect(() => {
     if (authLoading || !user) return;
+    if (sessionStartedFor.current === id) return;
+    sessionStartedFor.current = id;
     let cancelled = false;
 
     (async () => {
@@ -65,6 +77,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
             not_found: "This video is no longer available.",
             unauthorized: "Please log in to watch.",
             view_limit: `You have used all ${json.cap ?? 3} views for this video. Request access again to watch more.`,
+            sign: "Video delivery is not configured correctly. Please contact support — your views have not been used.",
           };
           setErrMsg(map[json.error] || "Unable to start playback.");
           setState("error");
