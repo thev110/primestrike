@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, VIDEO_BUCKET } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/videoAuth";
+import { syncBunnyVideosToCatalog } from "@/lib/bunnyStream";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // GET /api/admin/videos
-// Lists both the catalog (published videos students can request) and the raw
-// bucket files not yet added to the catalog.
+// Syncs videos from Bunny Stream library, then returns the catalog and bucket files.
 export async function GET(request: Request) {
   try {
     const admin = await requireAdmin(request);
     if (!admin) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
+
+    // Auto-sync any new videos uploaded directly on Bunny.net Stream
+    await syncBunnyVideosToCatalog().catch((err) => {
+      console.error("Auto sync Bunny videos error:", err);
+    });
 
     const { data: catalog, error: cErr } = await supabaseAdmin
       .from("videos")

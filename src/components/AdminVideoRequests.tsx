@@ -28,8 +28,10 @@ interface CatalogRow {
   title: string;
   description: string | null;
   storage_path: string;
+  bunny_video_id?: string;
   active: boolean;
 }
+
 
 interface TusCreds {
   endpoint: string;
@@ -122,11 +124,34 @@ export default function AdminVideoRequests() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return { Authorization: `Bearer ${session?.access_token || ""}` };
   }, []);
+
+  const syncBunny = async () => {
+    try {
+      setSyncing(true);
+      setError("");
+      const res = await fetch("/api/admin/videos/sync", {
+        method: "POST",
+        headers: await authHeader(),
+      });
+      if (res.ok) {
+        await load();
+      } else {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error || "Failed to sync Bunny Stream videos.");
+      }
+    } catch {
+      setError("Network error syncing with Bunny.net.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
 
   const load = useCallback(async () => {
     try {
@@ -524,10 +549,19 @@ export default function AdminVideoRequests() {
           </Card>
 
           <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
-            <CardHeader className="border-b border-white/5 py-4">
+            <CardHeader className="border-b border-white/5 py-4 flex flex-row items-center justify-between">
               <CardTitle className="text-md font-bold text-white font-[family-name:var(--font-poppins)]">
                 Catalog ({catalog.length})
               </CardTitle>
+              <Button
+                onClick={syncBunny}
+                disabled={syncing || loading}
+                variant="outline"
+                className="h-8 text-xs border-gold/30 text-gold hover:bg-gold/10 flex items-center gap-1.5"
+              >
+                {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Sync Bunny.net
+              </Button>
             </CardHeader>
             <CardContent className="pt-4 divide-y divide-white/5">
               {catalog.length === 0 ? (
@@ -536,10 +570,19 @@ export default function AdminVideoRequests() {
                 catalog.map((v) => (
                   <div key={v.id} className="py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className={`text-sm font-medium truncate ${v.active ? "text-white" : "text-white/40"}`}>
-                        {v.title}
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium truncate ${v.active ? "text-white" : "text-white/40"}`}>
+                          {v.title}
+                        </p>
+                        {v.bunny_video_id && (
+                          <span className="text-[9px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded font-mono">
+                            Bunny Stream
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-white/30 truncate">
+                        {v.bunny_video_id ? `ID: ${v.bunny_video_id}` : v.storage_path}
                       </p>
-                      <p className="text-[10px] text-white/30 truncate">{v.storage_path}</p>
                     </div>
                     <button
                       onClick={() => toggleActive(v.id, !v.active)}
@@ -554,6 +597,7 @@ export default function AdminVideoRequests() {
               )}
             </CardContent>
           </Card>
+
         </div>
       </div>
     </div>

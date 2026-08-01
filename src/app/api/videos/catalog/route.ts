@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthedUser } from "@/lib/videoAuth";
+import { syncBunnyVideosToCatalog } from "@/lib/bunnyStream";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,6 +15,11 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
+
+    // Ensure any videos uploaded directly on Bunny.net are synced into catalog
+    await syncBunnyVideosToCatalog().catch((err) => {
+      console.error("Catalog auto sync Bunny videos error:", err);
+    });
 
     const { data: videos, error: vErr } = await supabaseAdmin
       .from("videos")

@@ -229,3 +229,98 @@ export async function fetchVideoFromUrl(
     throw new Error(`Bunny fetch failed (${res.status}): ${await res.text()}`);
   }
 }
+
+export interface BunnyVideoListItem {
+  guid: string;
+  title: string;
+  status: number;
+  encodeProgress: number;
+  length: number;
+  dateUploaded?: string;
+  views?: number;
+}
+
+export async function listBunnyVideos(
+  page = 1,
+  itemsPerPage = 100
+): Promise<BunnyVideoListItem[]> {
+  const lib = libraryId();
+  const key = required("BUNNY_STREAM_API_KEY");
+  const res = await fetch(
+    `${VIDEO_API_BASE}/library/${lib}/videos?page=${page}&itemsPerPage=${itemsPerPage}&orderBy=date`,
+    {
+      headers: {
+        AccessKey: key,
+        accept: "application/json",
+      },
+      cache: "no-store",
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Bunny listBunnyVideos failed (${res.status}): ${await res.text()}`);
+  }
+
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+
+  return items.map((item: any) => ({
+    guid: item.guid,
+    title: item.title || "Untitled Video",
+    status: item.status ?? 0,
+    encodeProgress: item.encodeProgress ?? 0,
+    length: item.length ?? 0,
+    dateUploaded: item.dateUploaded,
+    views: item.views,
+  }));
+}
+
+// Imports any videos existing in Bunny Stream that are not yet recorded in Supabase videos catalog
+export async function syncBunnyVideosToCatalog(): Promise<{ synced: number; total: number }> {
+  try {
+    const { supabaseAdmin } = await import("@/lib/supabaseAdmin");
+    const bunnyVideos = await listBunnyVideos();
+    if (!bunnyVideos.length) return { synced: 0, total: 0 };
+
+    const { data: existing, error: fetchErr } = await supabaseAdmin
+      .from("videos")
+      .select("bunny_video_id");
+
+    if (fetchErr) {
+      console.error("Error fetching existing catalog for sync:", fetchErr);
+      return { synced: 0, total: bunnyVideos.length };
+    }
+
+    const existingIds = new Set(
+      (existing || []).map((v) => v.bunny_video_id).filter(Boolean)
+    );
+
+    const toInsert = bunnyVideos.filter((bv) => !existingIds.has(bv.guid));
+
+    if (toInsert.length === 0) {
+      return { synced: 0, total: bunnyVideos.length };
+    }
+
+    const rows = toInsert.map((bv) => ({
+      title: bv.title || "Bunny Stream Video",
+      description: `Uploaded on Bunny Stream (${bv.guid.slice(0, 8)}...)`,
+      storage_path: "",
+      bunny_video_id: bv.guid,
+      active: true,
+    }));
+
+    const { error: insertErr } = await supabaseAdmin.from("videos").insert(rows);
+
+    if (insertErr) {
+      console.error("Error inserting synced Bunny videos:", insertErr);
+    } else {
+      console.log(`Successfully synced ${rows.length} videos from Bunny.net to catalog.`);
+    }
+
+    return { synced: rows.length, total: bunnyVideos.length };
+  } catch (err) {
+    console.error("syncBunnyVideosToCatalog failed:", err);
+    return { synced: 0, total: 0 };
+  }
+}
+
