@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const { data: catalog, error: cErr } = await supabaseAdmin
       .from("videos")
-      .select("id, title, description, storage_path, active, created_at")
+      .select("id, title, description, storage_path, bunny_video_id, active, created_at")
       .order("created_at", { ascending: false });
 
     if (cErr) {

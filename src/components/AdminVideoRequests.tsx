@@ -31,6 +31,81 @@ interface CatalogRow {
   active: boolean;
 }
 
+interface TusCreds {
+  endpoint: string;
+  libraryId: string;
+  videoId: string;
+  expire: number;
+  signature: string;
+}
+
+// Minimal tus client. Uploads in chunks and reports progress, so a dropped
+// chunk retries from the last confirmed offset instead of restarting a
+// multi-hundred-megabyte lecture from zero.
+async function tusUpload(
+  file: File,
+  cred: TusCreds,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  const auth: Record<string, string> = {
+    "Tus-Resumable": "1.0.0",
+    AuthorizationSignature: cred.signature,
+    AuthorizationExpire: String(cred.expire),
+    LibraryId: cred.libraryId,
+    VideoId: cred.videoId,
+  };
+  const b64 = (s: string) =>
+    btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+
+  const create = await fetch(cred.endpoint, {
+    method: "POST",
+    headers: {
+      ...auth,
+      "Upload-Length": String(file.size),
+      "Upload-Metadata": `filetype ${b64(file.type || "video/mp4")},title ${b64(file.name)}`,
+    },
+  });
+  if (create.status !== 201) {
+    throw new Error(`Upload could not start (${create.status}).`);
+  }
+  const location = new URL(
+    create.headers.get("location") || "",
+    cred.endpoint
+  ).href;
+
+  const CHUNK = 16 * 1024 * 1024;
+  let offset = 0;
+  while (offset < file.size) {
+    const end = Math.min(offset + CHUNK, file.size);
+    let res: Response | null = null;
+
+    // Retry a failed chunk a couple of times before giving up — long uploads
+    // on a flaky connection should not lose all prior progress.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await fetch(location, {
+          method: "PATCH",
+          headers: {
+            ...auth,
+            "Upload-Offset": String(offset),
+            "Content-Type": "application/offset+octet-stream",
+          },
+          body: file.slice(offset, end),
+        });
+        if (res.status === 204) break;
+      } catch {
+        res = null;
+      }
+    }
+
+    if (!res || res.status !== 204) {
+      throw new Error(`Upload stalled at ${Math.round((offset / file.size) * 100)}%.`);
+    }
+    offset = Number(res.headers.get("upload-offset")) || end;
+    onProgress(Math.round((offset / file.size) * 100));
+  }
+}
+
 export default function AdminVideoRequests() {
   const [requests, setRequests] = useState<ReqRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogRow[]>([]);
@@ -46,6 +121,7 @@ export default function AdminVideoRequests() {
   const [publishing, setPublishing] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
 
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -109,30 +185,43 @@ export default function AdminVideoRequests() {
       setPublishing(true);
       setError("");
 
-      // Option 1: Direct file upload from computer via server route
+      // Option 1: Upload from computer, browser straight to Bunny.
+      // The file never passes through our server — Vercel rejects any request
+      // body over 4.5MB, and this keeps lecture bytes off the bandwidth bill.
       if (uploadFile) {
         setUploading(true);
-        const fd = new FormData();
-        fd.append("file", uploadFile);
-        fd.append("title", newTitle);
-        fd.append("description", newDesc);
+        setUploadPct(0);
 
-        const res = await fetch("/api/admin/videos/upload", {
+        const pres = await fetch("/api/admin/videos/presign", {
           method: "POST",
-          headers: await authHeader(),
-          body: fd,
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body: JSON.stringify({ title: newTitle, description: newDesc }),
+        });
+        const cred = await pres.json().catch(() => ({}));
+        if (!pres.ok) {
+          setError(cred.error || "Could not start upload.");
+          return;
+        }
+
+        try {
+          await tusUpload(uploadFile, cred, setUploadPct);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Upload failed.");
+          return;
+        }
+
+        // Bytes are in. Flip the catalog row live now that it is playable.
+        await fetch("/api/admin/videos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body: JSON.stringify({ id: cred.id, active: true }),
         });
 
-        if (res.ok) {
-          setNewTitle("");
-          setNewDesc("");
-          setNewPath("");
-          setUploadFile(null);
-          await load();
-        } else {
-          const j = await res.json().catch(() => ({}));
-          setError(j.error || "Server upload failed.");
-        }
+        setNewTitle("");
+        setNewDesc("");
+        setNewPath("");
+        setUploadFile(null);
+        await load();
         return;
       }
 
@@ -417,7 +506,7 @@ export default function AdminVideoRequests() {
                 {publishing || uploading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    {uploading ? "Uploading file..." : "Publishing..."}
+                    {uploading ? `Uploading to Bunny... ${uploadPct}%` : "Publishing..."}
                   </>
                 ) : (
                   <>

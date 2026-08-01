@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, VIDEO_BUCKET } from "@/lib/supabaseAdmin";
 import { getAuthedUser } from "@/lib/videoAuth";
+import { signedEmbedUrl } from "@/lib/bunnyStream";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // POST /api/video/session  body: { videoId }
 // The logged-in student opens a playback session. We verify they hold a LIVE
-// (granted, non-expired) request for this video, sign a short-lived URL for the
-// private object, and store it in an httpOnly cookie. The real Supabase URL is
-// never exposed to client JS or the DOM — the <video> streams via the proxy.
+// (granted, non-expired, under the view cap) request for this video, then mint
+// a short-lived signed Bunny embed URL. Bunny serves adaptive-bitrate HLS from
+// its CDN, so video bytes never pass through our server.
+//
+// Legacy fallback: videos not yet migrated to Bunny still stream via the
+// Supabase proxy at /api/video/stream using an httpOnly cookie.
 export async function POST(request: Request) {
   try {
     const user = await getAuthedUser(request);
@@ -25,7 +29,7 @@ export async function POST(request: Request) {
     // Verify a live grant for this exact user + video.
     const { data: grant, error: gErr } = await supabaseAdmin
       .from("video_requests")
-      .select("id, status, expires_at, view_count")
+      .select("id, status, expires_at, view_count, max_views")
       .eq("user_id", user.id)
       .eq("video_id", videoId)
       .maybeSingle();
@@ -40,19 +44,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "expired" }, { status: 403 });
     }
 
-    // Increment view count for this student request
-    supabaseAdmin
-      .from("video_requests")
-      .update({ view_count: (grant.view_count ?? 0) + 1 })
-      .eq("id", grant.id)
-      .then(({ error: vUpErr }) => {
-        if (vUpErr) console.error("Failed to increment view_count:", vUpErr);
-      });
+    // Enforce the per-grant view cap before handing out a playback token.
+    const used = grant.view_count ?? 0;
+    const cap = grant.max_views ?? 3;
+    if (used >= cap) {
+      return NextResponse.json(
+        { error: "view_limit", used, cap },
+        { status: 403 }
+      );
+    }
 
-    // Resolve the storage path (kept server-side only).
+    // Consume a view atomically: only succeeds while still under the cap, so
+    // two tabs opened together cannot both slip through.
+    const { data: consumed, error: cErr } = await supabaseAdmin
+      .from("video_requests")
+      .update({ view_count: used + 1 })
+      .eq("id", grant.id)
+      .eq("view_count", used)
+      .select("view_count")
+      .single();
+
+    if (cErr || !consumed) {
+      return NextResponse.json({ error: "view_limit", used, cap }, { status: 403 });
+    }
+
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("storage_path, title")
+      .select("storage_path, title, bunny_video_id")
       .eq("id", videoId)
       .single();
 
@@ -60,6 +78,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    const viewsLeft = cap - consumed.view_count;
+
+    // Preferred path: signed Bunny embed, streamed straight from the CDN.
+    if (video.bunny_video_id) {
+      return NextResponse.json(
+        {
+          ok: true,
+          source: "bunny",
+          embedUrl: signedEmbedUrl(video.bunny_video_id),
+          title: video.title,
+          watermark: user.email,
+          expiresAt: grant.expires_at,
+          viewsLeft,
+          cap,
+        },
+        { status: 200 }
+      );
+    }
+
+    // Legacy path: proxy the private Supabase object behind an httpOnly cookie.
     const { data: signed, error: signErr } = await supabaseAdmin.storage
       .from(VIDEO_BUCKET)
       .createSignedUrl(video.storage_path, 600);
@@ -70,7 +108,15 @@ export async function POST(request: Request) {
     }
 
     const res = NextResponse.json(
-      { ok: true, title: video.title, watermark: user.email, expiresAt: grant.expires_at },
+      {
+        ok: true,
+        source: "supabase",
+        title: video.title,
+        watermark: user.email,
+        expiresAt: grant.expires_at,
+        viewsLeft,
+        cap,
+      },
       { status: 200 }
     );
     // httpOnly so client JS can never read/copy the signed URL. Short max-age.
