@@ -181,10 +181,13 @@ export default function JoinPage() {
 
   // ── UPI String generator ────────────────────────────────────
   const generateUpiUri = (upiId: string) => {
+    const cleanUpi = (upiId || "").trim();
     const amountVal = parseFloat((paidAmount || "0").toString().replace(/[^0-9.]/g, "")) || 0;
-    const payeeName = encodeURIComponent("Prime Strike Academy");
-    const note = encodeURIComponent(`${batchName} - ${name}`);
-    return `upi://pay?pa=${upiId}&pn=${payeeName}&am=${amountVal}&cu=INR&tn=${note}`;
+    const payeeName = encodeURIComponent("Prime Strike");
+    if (amountVal > 0) {
+      return `upi://pay?pa=${cleanUpi}&pn=${payeeName}&am=${amountVal}&cu=INR`;
+    }
+    return `upi://pay?pa=${cleanUpi}&pn=${payeeName}&cu=INR`;
   };
 
   // ── Pre-filled WhatsApp message ──────────────────────────────

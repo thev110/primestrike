@@ -63,7 +63,7 @@ export const FOUNDER_NAME = "Saranya";
 
 // ─── Payment UPI Configuration ──────────────────────────
 export const PRIMARY_UPI_ID = "studiofoxglove@oksbi";
-export const SECONDARY_UPI_ID = "mharinath27@oksb";
+export const SECONDARY_UPI_ID = "mharinath27@oksbi";
 export const PAYMENT_SUPPORT_PHONE = "+91 95002 98631";
 export const PAYMENT_SUPPORT_WHATSAPP = "https://wa.me/919500298631";
 
