@@ -301,9 +301,11 @@ export default function SurveyPage() {
                       className="w-full h-10 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs px-3 outline-none focus:border-gold/50 cursor-pointer"
                       disabled={loading}
                     >
-                      <option value="Batch 3">Batch 3 (Upcoming / Active)</option>
-                      <option value="Batch 4">Batch 4 (Next Batch)</option>
-                      <option value="Batch 2">Batch 2 (Previous)</option>
+                      <option value="Batch 5">Batch 5 (Enrollment Open)</option>
+                      <option value="Batch 6">Batch 6 (Enrollment Open)</option>
+                      <option value="Batch 4">Batch 4 (Upcoming)</option>
+                      <option value="Batch 3">Batch 3 (Active)</option>
+                      <option value="Batch 2">Batch 2 (Completed)</option>
                       <option value="Batch 1">Batch 1 (Alumni)</option>
                     </select>
                   </div>

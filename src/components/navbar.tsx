@@ -126,7 +126,7 @@ export function Navbar() {
                 variant="outline"
                 className="rounded-full px-5 h-10 font-medium border-gold/45 text-gold hover:bg-gold/5 hover:text-gold transition-all text-sm"
               >
-                <Link href="/survey">Joined Course</Link>
+                <Link href="/join">Join & Pay Fees</Link>
               </Button>
               <motion.div
                 whileHover={{ scale: 1.05 }}
@@ -266,8 +266,8 @@ export function Navbar() {
                             asChild
                             className="w-full h-12 rounded-lg bg-gold text-gold-foreground hover:bg-gold/90 font-medium text-base group"
                           >
-                            <Link href="/survey">
-                              Joined Course
+                            <Link href="/join">
+                              Join & Pay Fees
                               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                             </Link>
                           </Button>

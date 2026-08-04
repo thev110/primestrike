@@ -61,9 +61,26 @@ export const SITE_WHATSAPP = "+91 95002 98631";
 export const EST_YEAR = "2024";
 export const FOUNDER_NAME = "Saranya";
 
+// ─── Payment UPI Configuration ──────────────────────────
+export const PRIMARY_UPI_ID = "studiofoxglove@oksbi";
+export const SECONDARY_UPI_ID = "mharinath27@oksb";
+export const PAYMENT_SUPPORT_PHONE = "+91 95002 98631";
+export const PAYMENT_SUPPORT_WHATSAPP = "https://wa.me/919500298631";
+
+// ─── Student Batches ─────────────────────────────────────
+export const STUDENT_BATCHES = [
+  { id: "Batch 1", label: "Batch 1 (Alumni)" },
+  { id: "Batch 2", label: "Batch 2 (Completed)" },
+  { id: "Batch 3", label: "Batch 3 (Active)" },
+  { id: "Batch 4", label: "Batch 4 (Upcoming)" },
+  { id: "Batch 5", label: "Batch 5 (Enrollment Open)" },
+  { id: "Batch 6", label: "Batch 6 (Enrollment Open)" },
+];
+
 // ─── Navigation ──────────────────────────────────────────
 export const NAV_LINKS: NavLink[] = [
   { label: "Home", href: "/" },
+  { label: "Join & Pay Fees", href: "/join" },
   { label: "Services", href: "/services" },
   { label: "Contact", href: "/contact" },
 ];
