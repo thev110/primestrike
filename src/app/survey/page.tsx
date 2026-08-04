@@ -27,22 +27,53 @@ export default function SurveyPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [batchName, setBatchName] = useState("Batch 3");
   const [joinedCourse, setJoinedCourse] = useState("Basic to Advance");
   const [firstClassDate, setFirstClassDate] = useState("");
-  const [paidAmount, setPaidAmount] = useState("");
+  
+  // Pricing & Payment mode states
+  const [totalFee, setTotalFee] = useState(25000);
+  const [paymentMode, setPaymentMode] = useState<"full" | "unpaid" | "custom">("full");
+  const [paidAmount, setPaidAmount] = useState("25000");
   const [notes, setNotes] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle course changes with fee auto-fill
+  const handleCourseChange = (course: string) => {
+    setJoinedCourse(course);
+    const fee = course === "Basic to Advance" ? 25000 : 15000;
+    setTotalFee(fee);
+    if (paymentMode === "full") {
+      setPaidAmount(fee.toString());
+    } else if (paymentMode === "unpaid") {
+      setPaidAmount("0");
+    }
+  };
+
+  // Handle payment status button toggles
+  const handlePaymentModeChange = (mode: "full" | "unpaid" | "custom") => {
+    setPaymentMode(mode);
+    if (mode === "full") {
+      setPaidAmount(totalFee.toString());
+    } else if (mode === "unpaid") {
+      setPaidAmount("0");
+    }
+  };
+
+  // Calculated balance
+  const numericPaid = parseFloat((paidAmount || "0").toString().replace(/[^0-9.]/g, "")) || 0;
+  const balanceAmount = Math.max(0, totalFee - numericPaid);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (!name || !email || !phone || !joinedCourse || !firstClassDate || !paidAmount) {
-      setError("Please fill in all required fields (Name, Email, Phone, Joined Course, First Class Date, and Paid Amount).");
+    if (!name || !email || !phone || !joinedCourse || !firstClassDate) {
+      setError("Please fill in all required fields (Name, Email, Phone, Joined Course, and First Class Date).");
       setLoading(false);
       return;
     }
@@ -57,9 +88,13 @@ export default function SurveyPage() {
           name,
           email,
           phone,
+          batchName,
           joinedCourse,
           firstClassDate,
-          paidAmount,
+          totalFee,
+          paidAmount: numericPaid.toString(),
+          balanceAmount: balanceAmount.toString(),
+          paymentMode,
           notes,
         }),
       });
@@ -251,20 +286,45 @@ export default function SurveyPage() {
                 {/* Section 2: Joined Course Details */}
                 <div className="space-y-4 pt-2">
                   <h3 className="text-xs font-bold text-gold uppercase tracking-wider border-b border-white/5 pb-1">
-                    2. Joined Course & Class Details
+                    2. Joined Course & Batch Details
                   </h3>
+
+                  {/* Batch Selection */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
+                      <GraduationCap className="h-4 w-4 text-gold" />
+                      Select Student Batch *
+                    </label>
+                    <select
+                      value={batchName}
+                      onChange={(e) => setBatchName(e.target.value)}
+                      className="w-full h-10 bg-neutral-900 border border-white/10 rounded-xl text-white text-xs px-3 outline-none focus:border-gold/50 cursor-pointer"
+                      disabled={loading}
+                    >
+                      <option value="Batch 3">Batch 3 (Upcoming / Active)</option>
+                      <option value="Batch 4">Batch 4 (Next Batch)</option>
+                      <option value="Batch 2">Batch 2 (Previous)</option>
+                      <option value="Batch 1">Batch 1 (Alumni)</option>
+                    </select>
+                  </div>
 
                   {/* Course selection options */}
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
-                      <BookOpen className="h-4 w-4 text-gold" />
-                      Select Joined Course *
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4 text-gold" />
+                        Select Joined Course *
+                      </label>
+                      <span className="text-[11px] text-gold font-semibold">
+                        Rate: ₹{totalFee.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => setJoinedCourse("Basic to Advance")}
-                        className={`p-3.5 border rounded-xl text-left transition-all flex flex-col gap-1.5 ${
+                        onClick={() => handleCourseChange("Basic to Advance")}
+                        className={`p-3.5 border rounded-xl text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
                           joinedCourse === "Basic to Advance"
                             ? "bg-gold/10 border-gold text-white ring-1 ring-gold/40"
                             : "border-white/10 bg-white/[0.01] hover:border-white/20 text-white/70"
@@ -274,7 +334,7 @@ export default function SurveyPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-white">Basic to Advance</span>
                           <span className="text-[10px] bg-gold/20 text-gold font-semibold px-2 py-0.5 rounded-full border border-gold/30">
-                            Comprehensive
+                            ₹25,000
                           </span>
                         </div>
                         <span className="text-[11px] text-white/50 leading-snug">
@@ -284,8 +344,8 @@ export default function SurveyPage() {
 
                       <button
                         type="button"
-                        onClick={() => setJoinedCourse("Advance Level")}
-                        className={`p-3.5 border rounded-xl text-left transition-all flex flex-col gap-1.5 ${
+                        onClick={() => handleCourseChange("Advance Level")}
+                        className={`p-3.5 border rounded-xl text-left transition-all flex flex-col gap-1.5 cursor-pointer ${
                           joinedCourse === "Advance Level"
                             ? "bg-gold/10 border-gold text-white ring-1 ring-gold/40"
                             : "border-white/10 bg-white/[0.01] hover:border-white/20 text-white/70"
@@ -295,7 +355,7 @@ export default function SurveyPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-white">Advance Level</span>
                           <span className="text-[10px] bg-purple-500/20 text-purple-300 font-semibold px-2 py-0.5 rounded-full border border-purple-500/30">
-                            Pro Trader
+                            ₹15,000
                           </span>
                         </div>
                         <span className="text-[11px] text-white/50 leading-snug">
@@ -305,47 +365,118 @@ export default function SurveyPage() {
                     </div>
                   </div>
 
-                  {/* Class Date and Paid Amount */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-gold" />
-                        First Class Date *
-                      </label>
-                      <div className="relative">
-                        <Input
-                          type="date"
-                          value={firstClassDate}
-                          onChange={(e) => setFirstClassDate(e.target.value)}
-                          onClick={(e) => {
-                            try {
-                              e.currentTarget.showPicker?.();
-                            } catch (err) {}
-                          }}
-                          style={{ colorScheme: "dark" }}
-                          className="h-10 bg-white/5 border-white/10 text-white text-xs focus:border-gold/50 focus:ring-gold/20 cursor-pointer [color-scheme:dark]"
-                          disabled={loading}
-                          required
-                        />
+                  {/* Payment Mode Selection & Amounts */}
+                  <div className="space-y-3 pt-1">
+                    <label className="text-xs font-semibold text-white/70 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <IndianRupee className="h-4 w-4 text-gold" />
+                        Payment Status Mode (Optional Custom Mode)
+                      </span>
+                      <span className="text-[10px] text-white/40 uppercase tracking-wider">Select payment option</span>
+                    </label>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentModeChange("full")}
+                        className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                          paymentMode === "full"
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 ring-1 ring-emerald-500/30"
+                            : "bg-white/5 text-white/60 border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        Full Paid (₹{totalFee.toLocaleString("en-IN")})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentModeChange("unpaid")}
+                        className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                          paymentMode === "unpaid"
+                            ? "bg-rose-500/20 text-rose-400 border-rose-500/40 ring-1 ring-rose-500/30"
+                            : "bg-white/5 text-white/60 border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        Unpaid (₹0)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentModeChange("custom")}
+                        className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                          paymentMode === "custom"
+                            ? "bg-gold/20 text-gold border-gold/40 ring-1 ring-gold/30"
+                            : "bg-white/5 text-white/60 border-white/10 hover:border-white/20"
+                        }`}
+                      >
+                        Custom Mode
+                      </button>
+                    </div>
+
+                    {/* Class Date & Paid Input */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
+                          <Calendar className="h-4 w-4 text-gold" />
+                          First Class Date *
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={firstClassDate}
+                            onChange={(e) => setFirstClassDate(e.target.value)}
+                            onClick={(e) => {
+                              try {
+                                e.currentTarget.showPicker?.();
+                              } catch (err) {}
+                            }}
+                            style={{ colorScheme: "dark" }}
+                            className="h-10 bg-white/5 border-white/10 text-white text-xs focus:border-gold/50 focus:ring-gold/20 cursor-pointer [color-scheme:dark]"
+                            disabled={loading}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-white/70 flex items-center justify-between">
+                          <span>Paid Amount (Fees)</span>
+                          {paymentMode === "custom" && (
+                            <span className="text-[10px] text-gold font-medium">Custom Amount Mode</span>
+                          )}
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gold font-semibold text-xs">₹</span>
+                          <Input
+                            type="text"
+                            placeholder="e.g. 15,000"
+                            value={paidAmount}
+                            onChange={(e) => {
+                              setPaidAmount(e.target.value);
+                              if (paymentMode !== "custom") {
+                                setPaymentMode("custom");
+                              }
+                            }}
+                            className="pl-8 h-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 text-xs focus:border-gold/50 focus:ring-gold/20"
+                            disabled={loading}
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-white/70 flex items-center gap-1.5">
-                        <IndianRupee className="h-4 w-4 text-gold" />
-                        Paid Amount (Fees) *
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gold font-semibold text-xs">₹</span>
-                        <Input
-                          type="text"
-                          placeholder="e.g. 15,000"
-                          value={paidAmount}
-                          onChange={(e) => setPaidAmount(e.target.value)}
-                          className="pl-8 h-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 text-xs focus:border-gold/50 focus:ring-gold/20"
-                          disabled={loading}
-                          required
-                        />
+                    {/* Live Financial Summary Box */}
+                    <div className="p-3 bg-neutral-900/80 border border-white/10 rounded-xl flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-white/50">Total Fee: </span>
+                        <span className="font-semibold text-white">₹{totalFee.toLocaleString("en-IN")}</span>
+                        <span className="text-white/30 mx-2">|</span>
+                        <span className="text-white/50">Paid Amount: </span>
+                        <span className="font-semibold text-emerald-400">₹{numericPaid.toLocaleString("en-IN")}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-white/50">Balance Due: </span>
+                        <span className={`font-bold ${balanceAmount > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                          ₹{balanceAmount.toLocaleString("en-IN")}
+                        </span>
                       </div>
                     </div>
                   </div>

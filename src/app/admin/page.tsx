@@ -41,6 +41,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import AdminVideoRequests from "@/components/AdminVideoRequests";
 import AdminHomeworkSubmissions from "@/components/AdminHomeworkSubmissions";
+import * as XLSX from "xlsx";
 
 interface EventItem {
   id: string;
@@ -87,6 +88,7 @@ export default function AdminDashboard() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState("all");
   const [fetchingData, setFetchingData] = useState(true);
 
   // Audit Modal State
@@ -331,76 +333,123 @@ export default function AdminDashboard() {
   };
 
   const parseLeadData = (lead: Lead) => {
+    let batch = "Batch 3";
     let course = lead.joined_course || lead.experience || "Basic to Advance";
     let firstClassDate = lead.first_class_date || "";
-    let paidAmount = lead.paid_amount || "";
+    let paidAmountRaw = lead.paid_amount || "";
+    let feeVal = course.toLowerCase().includes("advance level") ? 15000 : 25000;
+    let paidVal = 0;
+    let balanceVal = 0;
+    let pMode = "CUSTOM";
     let displayNotes = lead.notes || "";
 
     if (lead.notes) {
-      const courseMatch = lead.notes.match(/Joined Course:\s*([^|\]]+)/i);
-      const dateMatch = lead.notes.match(/1st Class Date:\s*([^|\]]+)/i);
-      const feesMatch = lead.notes.match(/Paid Fees:\s*([^|\]]+)/i);
+      const batchMatch = lead.notes.match(/Batch:\s*([^|\]]+)/i);
+      const courseMatch = lead.notes.match(/Course:\s*([^|\]]+)/i) || lead.notes.match(/Joined Course:\s*([^|\]]+)/i);
+      const feeMatch = lead.notes.match(/Fee:\s*([^|\]]+)/i);
+      const paidMatch = lead.notes.match(/Paid:\s*([^|\]]+)/i) || lead.notes.match(/Paid Fees:\s*([^|\]]+)/i);
+      const balanceMatch = lead.notes.match(/Balance:\s*([^|\]]+)/i);
+      const modeMatch = lead.notes.match(/Mode:\s*([^|\]]+)/i);
+      const dateMatch = lead.notes.match(/Date:\s*([^|\]]+)/i) || lead.notes.match(/1st Class Date:\s*([^|\]]+)/i);
+      const remarksMatch = lead.notes.match(/— Remarks:\s*(.*)/i) || lead.notes.match(/— Notes:\s*(.*)/i);
 
-      if (courseMatch && (!lead.joined_course || lead.experience === "beginner")) {
-        course = courseMatch[1].trim();
+      if (batchMatch) batch = batchMatch[1].trim();
+      if (courseMatch) course = courseMatch[1].trim();
+      if (feeMatch) {
+        const num = parseFloat(feeMatch[1].replace(/[^0-9.]/g, ""));
+        if (!isNaN(num)) feeVal = num;
       }
-      if (dateMatch && !lead.first_class_date) {
+      if (paidMatch) {
+        paidAmountRaw = paidMatch[1].trim();
+        const num = parseFloat(paidAmountRaw.replace(/[^0-9.]/g, ""));
+        if (!isNaN(num)) paidVal = num;
+      } else if (paidAmountRaw) {
+        const num = parseFloat(paidAmountRaw.replace(/[^0-9.]/g, ""));
+        if (!isNaN(num)) paidVal = num;
+      }
+      if (balanceMatch) {
+        const num = parseFloat(balanceMatch[1].replace(/[^0-9.]/g, ""));
+        if (!isNaN(num)) balanceVal = num;
+      } else {
+        balanceVal = Math.max(0, feeVal - paidVal);
+      }
+      if (modeMatch) pMode = modeMatch[1].trim();
+      if (dateMatch && !firstClassDate) {
         const d = dateMatch[1].trim();
-        if (d !== "Not set" && d !== "To be scheduled") {
-          firstClassDate = d;
-        }
+        if (d !== "Not set" && d !== "To be scheduled") firstClassDate = d;
       }
-      if (feesMatch && !lead.paid_amount) {
-        const f = feesMatch[1].trim();
-        if (f !== "Recorded" && f !== "—") {
-          paidAmount = f;
-        }
+      if (remarksMatch) {
+        displayNotes = remarksMatch[1].trim();
+      } else {
+        displayNotes = lead.notes.replace(/^\[.*?\]\s*/i, "").trim();
       }
-
-      displayNotes = lead.notes.replace(/^\[Joined Course:.*?\]\s*/i, "").trim();
+    } else {
+      const num = parseFloat(paidAmountRaw.replace(/[^0-9.]/g, ""));
+      if (!isNaN(num)) paidVal = num;
+      balanceVal = Math.max(0, feeVal - paidVal);
     }
 
     if (course.toLowerCase() === "beginner" || course.toLowerCase() === "intermediate") {
       course = "Basic to Advance";
     }
 
+    let pStatus = "PARTIAL";
+    if (paidVal >= feeVal && feeVal > 0) pStatus = "FULL PAID";
+    else if (paidVal === 0) pStatus = "UNPAID";
+
     return {
+      batch,
       course,
       firstClassDate: firstClassDate || "To be scheduled",
-      paidAmount: paidAmount ? (paidAmount.startsWith("₹") ? paidAmount : `₹${paidAmount}`) : "Recorded",
+      feeVal,
+      paidVal,
+      balanceVal,
+      paymentStatus: pStatus,
+      paymentMode: pMode,
       displayNotes: displayNotes || "—"
     };
   };
 
   const handleExportCSV = () => {
-    if (leads.length === 0) return;
+    handleExportExcel();
+  };
 
-    const headers = ["Date", "Student Name", "Email", "Phone", "Joined Course", "First Class Date", "Paid Fees", "Status", "Notes / Remarks"];
-    
-    const rows = leads.map(lead => {
+  const handleExportExcel = () => {
+    const leadsToExport = selectedBatchFilter === "all" 
+      ? leads 
+      : leads.filter(l => parseLeadData(l).batch.toLowerCase() === selectedBatchFilter.toLowerCase());
+
+    if (leadsToExport.length === 0) {
+      alert("No student lead data to export.");
+      return;
+    }
+
+    const data = leadsToExport.map(lead => {
       const parsed = parseLeadData(lead);
       const dateStr = new Date(lead.created_at).toLocaleDateString("en-IN");
-      return [
-        `"${dateStr}"`,
-        `"${(lead.name || "").replace(/"/g, '""')}"`,
-        `"${(lead.email || "").replace(/"/g, '""')}"`,
-        `"${(lead.phone || "").replace(/"/g, '""')}"`,
-        `"${parsed.course.replace(/"/g, '""')}"`,
-        `"${parsed.firstClassDate.replace(/"/g, '""')}"`,
-        `"${parsed.paidAmount.replace(/"/g, '""')}"`,
-        `"${(lead.status || "new").toUpperCase()}"`,
-        `"${parsed.displayNotes.replace(/"/g, '""')}"`
-      ].join(",");
+      return {
+        "Date Registered": dateStr,
+        "Student Name": lead.name || "",
+        "Email": lead.email || "",
+        "Phone": lead.phone || "",
+        "Batch": parsed.batch,
+        "Joined Course": parsed.course,
+        "Total Fee Rate (₹)": parsed.feeVal,
+        "Paid Amount (₹)": parsed.paidVal,
+        "Balance Amount (₹)": parsed.balanceVal,
+        "Payment Status": parsed.paymentStatus,
+        "First Class Date": parsed.firstClassDate,
+        "Lead Status": (lead.status || "new").toUpperCase(),
+        "Additional Notes / Remarks": parsed.displayNotes
+      };
     });
 
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `prime_strike_joined_courses_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Joined Course Students");
+
+    const batchSuffix = selectedBatchFilter !== "all" ? `_${selectedBatchFilter.replace(/\s+/g, "_")}` : "";
+    XLSX.writeFile(workbook, `Prime_Strike_Students${batchSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   if (authLoading || !user || !profile || profile.role !== "admin") {
@@ -866,13 +915,12 @@ export default function AdminDashboard() {
                         </>
                       )}
                     </Button>
-                  </form>
+                              </form>
                 </CardContent>
               </Card>
             </div>
           </motion.div>
         )}
-
         {/* TAB 2: TRADING ASSESSMENT LEADS */}
         {activeTab === "leads" && (
           <motion.div
@@ -880,23 +928,41 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
           >
             <Card className="border border-white/10 bg-neutral-950/80 backdrop-blur-md">
-              <CardHeader className="border-b border-white/5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <CardHeader className="border-b border-white/5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                   <CardTitle className="text-md font-bold flex items-center gap-2 text-white font-[family-name:var(--font-poppins)]">
                     <TrendingUp className="h-4.5 w-4.5 text-gold" />
                     Joined Course Submissions & Enquiries ({leads.length})
                   </CardTitle>
                   <CardDescription className="text-white/50 text-xs">
-                    Review student course registrations, check first class dates, and verify fees paid.
+                    Review student course registrations, filter by batch, check payment status & balance due.
                   </CardDescription>
                 </div>
-                <Button
-                  onClick={handleExportCSV}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-9 px-3.5 rounded-xl flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Download Excel Sheet (.CSV)
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Batch Filter Selector */}
+                  <div className="flex items-center gap-1.5 bg-neutral-900 border border-white/10 px-3 py-1 rounded-xl text-xs">
+                    <span className="text-white/50 text-[11px]">Filter Batch:</span>
+                    <select
+                      value={selectedBatchFilter}
+                      onChange={(e) => setSelectedBatchFilter(e.target.value)}
+                      className="bg-transparent text-white font-semibold text-xs outline-none cursor-pointer"
+                    >
+                      <option value="all" className="bg-neutral-900">All Batches</option>
+                      <option value="Batch 3" className="bg-neutral-900">Batch 3</option>
+                      <option value="Batch 4" className="bg-neutral-900">Batch 4</option>
+                      <option value="Batch 2" className="bg-neutral-900">Batch 2</option>
+                      <option value="Batch 1" className="bg-neutral-900">Batch 1</option>
+                    </select>
+                  </div>
+
+                  <Button
+                    onClick={handleExportExcel}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-9 px-3.5 rounded-xl flex items-center gap-2 transition-all shadow-md shrink-0 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Download Excel Sheet (.xlsx)
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-4 px-0">
                 {fetchingData ? (
@@ -911,110 +977,140 @@ export default function AdminDashboard() {
                         <tr className="border-b border-white/5 text-white/55 text-xs font-semibold uppercase tracking-wider bg-white/[0.01]">
                           <th className="py-3 px-6">Date & Student Name</th>
                           <th className="py-3 px-6">Contact Details</th>
-                          <th className="py-3 px-6">Joined Course</th>
-                          <th className="py-3 px-6">Class Date & Fees</th>
+                          <th className="py-3 px-6">Batch & Course</th>
+                          <th className="py-3 px-6">Fee & Payment Status</th>
+                          <th className="py-3 px-6">Class Date</th>
                           <th className="py-3 px-6">Notes / Remarks</th>
-                          <th className="py-3 px-6">Status Badge</th>
+                          <th className="py-3 px-6">Lead Status</th>
                           <th className="py-3 px-6 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {leads.map((lead) => {
-                          const parsed = parseLeadData(lead);
-                          const isAdvance = parsed.course.toLowerCase().includes("advance level");
+                        {leads
+                          .filter((lead) => 
+                            selectedBatchFilter === "all" 
+                              ? true 
+                              : parseLeadData(lead).batch.toLowerCase() === selectedBatchFilter.toLowerCase()
+                          )
+                          .map((lead) => {
+                            const parsed = parseLeadData(lead);
+                            const isAdvance = parsed.course.toLowerCase().includes("advance level");
 
-                          return (
-                            <tr key={lead.id} className="hover:bg-white/[0.02] transition-all">
-                              <td className="py-3.5 px-6 font-medium text-white">
-                                <div className="font-semibold text-white text-sm">{lead.name}</div>
-                                <div className="text-[10px] text-white/40">
-                                  {new Date(lead.created_at).toLocaleDateString("en-IN", {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric"
-                                  })}
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-6 space-y-1">
-                                <div className="flex items-center gap-1.5 text-xs text-white/80">
-                                  <Mail className="h-3.5 w-3.5 text-gold shrink-0" />
-                                  <a href={`mailto:${lead.email}`} className="hover:underline hover:text-gold truncate max-w-[160px]">
-                                    {lead.email}
-                                  </a>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-white/80">
-                                  <Phone className="h-3.5 w-3.5 text-gold shrink-0" />
-                                  <a href={`tel:${lead.phone}`} className="hover:underline hover:text-gold font-medium">
-                                    {lead.phone}
-                                  </a>
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-6">
-                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider inline-block ${
-                                  isAdvance
-                                    ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
-                                    : "bg-gold/15 text-gold border-gold/40"
-                                }`}>
-                                  {parsed.course}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-6 space-y-1">
-                                <div className="text-xs flex items-center gap-1 text-white/90">
-                                  <span className="text-white/40">1st Class:</span>
-                                  <span className="text-gold font-semibold">{parsed.firstClassDate}</span>
-                                </div>
-                                <div className="text-xs flex items-center gap-1 text-white/90">
-                                  <span className="text-white/40">Paid Fees:</span>
-                                  <span className="text-emerald-400 font-bold">{parsed.paidAmount}</span>
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-6 max-w-[200px]">
-                                <p className="text-xs text-white/70 line-clamp-2" title={parsed.displayNotes}>
-                                  {parsed.displayNotes}
-                                </p>
-                              </td>
-                              <td className="py-3.5 px-6">
-                                <span className={`text-[9px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
-                                  lead.status === "new"
-                                    ? "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"
-                                    : lead.status === "contacted"
-                                    ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                                    : lead.status === "joined"
-                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                    : "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20"
-                                }`}>
-                                  {lead.status}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-6 text-right">
-                                <div className="flex justify-end items-center gap-2">
-                                  <select
-                                    value={lead.status}
-                                    onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
-                                    className="bg-neutral-900 border border-white/10 rounded-lg text-white text-[11px] h-8 px-2 outline-none focus:border-gold/50 cursor-pointer"
-                                  >
-                                    <option value="new">New Lead</option>
-                                    <option value="contacted">Contacted</option>
-                                    <option value="joined">Joined Academy</option>
-                                    <option value="ignored">Ignored</option>
-                                  </select>
-                                  <Button
-                                    onClick={() => handleDeleteLead(lead.id)}
-                                    variant="ghost"
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 h-8 w-8 rounded-lg transition-all shrink-0"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                            return (
+                              <tr key={lead.id} className="hover:bg-white/[0.02] transition-all">
+                                <td className="py-3.5 px-6 font-medium text-white">
+                                  <div className="font-semibold text-white text-sm">{lead.name}</div>
+                                  <div className="text-[10px] text-white/40">
+                                    {new Date(lead.created_at).toLocaleDateString("en-IN", {
+                                      year: "numeric",
+                                      month: "short",
+                                      day: "numeric"
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-6 space-y-1">
+                                  <div className="flex items-center gap-1.5 text-xs text-white/80">
+                                    <Mail className="h-3.5 w-3.5 text-gold shrink-0" />
+                                    <a href={`mailto:${lead.email}`} className="hover:underline hover:text-gold truncate max-w-[160px]">
+                                      {lead.email}
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs text-white/80">
+                                    <Phone className="h-3.5 w-3.5 text-gold shrink-0" />
+                                    <a href={`tel:${lead.phone}`} className="hover:underline hover:text-gold font-medium">
+                                      {lead.phone}
+                                    </a>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-6 space-y-1">
+                                  <span className="text-[10px] bg-white/10 text-white font-bold px-2 py-0.5 rounded-full border border-white/15 block w-fit">
+                                    {parsed.batch}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider inline-block ${
+                                    isAdvance
+                                      ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
+                                      : "bg-gold/15 text-gold border-gold/40"
+                                  }`}>
+                                    {parsed.course}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-6 space-y-1">
+                                  <div className="text-xs flex items-center gap-1 text-white/80">
+                                    <span>Rate:</span>
+                                    <span className="font-semibold text-white">₹{parsed.feeVal.toLocaleString("en-IN")}</span>
+                                  </div>
+                                  <div className="text-xs flex items-center gap-1 text-white/90">
+                                    <span>Paid:</span>
+                                    <span className="text-emerald-400 font-bold">₹{parsed.paidVal.toLocaleString("en-IN")}</span>
+                                  </div>
+                                  <div className="text-xs flex items-center gap-1">
+                                    <span className="text-white/40">Balance:</span>
+                                    <span className={`font-bold ${parsed.balanceVal > 0 ? "text-amber-400" : "text-emerald-400"}`}>
+                                      ₹{parsed.balanceVal.toLocaleString("en-IN")}
+                                    </span>
+                                  </div>
+                                  <div className="pt-0.5">
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                                      parsed.paymentStatus === "FULL PAID"
+                                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                        : parsed.paymentStatus === "UNPAID"
+                                        ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                                        : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                    }`}>
+                                      {parsed.paymentStatus}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-6">
+                                  <span className="text-xs text-gold font-medium">{parsed.firstClassDate}</span>
+                                </td>
+                                <td className="py-3.5 px-6 max-w-[180px]">
+                                  <p className="text-xs text-white/70 line-clamp-2" title={parsed.displayNotes}>
+                                    {parsed.displayNotes}
+                                  </p>
+                                </td>
+                                <td className="py-3.5 px-6">
+                                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded uppercase tracking-wider ${
+                                    lead.status === "new"
+                                      ? "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse"
+                                      : lead.status === "contacted"
+                                      ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                      : lead.status === "joined"
+                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                      : "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20"
+                                  }`}>
+                                    {lead.status}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-6 text-right">
+                                  <div className="flex justify-end items-center gap-2">
+                                    <select
+                                      value={lead.status}
+                                      onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
+                                      className="bg-neutral-900 border border-white/10 rounded-lg text-white text-[11px] h-8 px-2 outline-none focus:border-gold/50 cursor-pointer"
+                                    >
+                                      <option value="new">New Lead</option>
+                                      <option value="contacted">Contacted</option>
+                                      <option value="joined">Joined Academy</option>
+                                      <option value="ignored">Ignored</option>
+                                    </select>
+                                    <Button
+                                      onClick={() => handleDeleteLead(lead.id)}
+                                      variant="ghost"
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 h-8 w-8 rounded-lg transition-all shrink-0"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <p className="text-center py-8 text-sm text-white/40">No course registrations or enquiries submitted yet.</p>
+                  <div className="py-8 text-center text-white/40">No course submissions recorded yet.</div>
                 )}
               </CardContent>
             </Card>

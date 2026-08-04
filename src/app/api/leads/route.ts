@@ -8,9 +8,27 @@ export const revalidate = 0;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, phone, joinedCourse, experience, firstClassDate, paidAmount, notes } = body;
+    const { 
+      name, 
+      email, 
+      phone, 
+      batchName, 
+      joinedCourse, 
+      experience, 
+      firstClassDate, 
+      totalFee, 
+      paidAmount, 
+      balanceAmount, 
+      paymentMode, 
+      notes 
+    } = body;
 
     const courseSelected = joinedCourse || "Basic to Advance";
+    const batch = batchName || "Batch 3";
+    const fee = totalFee ? `₹${totalFee}` : (courseSelected === "Basic to Advance" ? "₹25,000" : "₹15,000");
+    const paid = paidAmount !== undefined && paidAmount !== null && paidAmount !== "" ? `₹${paidAmount}` : "₹0";
+    const balance = balanceAmount !== undefined && balanceAmount !== null && balanceAmount !== "" ? `₹${balanceAmount}` : "₹0";
+    const pMode = paymentMode ? paymentMode.toUpperCase() : "CUSTOM";
 
     if (!name || !email || !phone) {
       return NextResponse.json(
@@ -19,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const formattedNotes = `[Joined Course: ${courseSelected} | 1st Class Date: ${firstClassDate || "Not set"} | Paid Fees: ₹${paidAmount || "Recorded"}]${notes ? ` — Notes: ${notes}` : ""}`;
+    const formattedNotes = `[Batch: ${batch} | Course: ${courseSelected} | Fee: ${fee} | Paid: ${paid} | Balance: ${balance} | Mode: ${pMode} | Date: ${firstClassDate || "Not set"}]${notes ? ` — Remarks: ${notes}` : ""}`;
 
     // 1. Try inserting with new columns first
     const fullPayload = {
@@ -63,7 +81,6 @@ export async function POST(request: Request) {
     }
 
     // 3. Send email in background — don't let SMTP failures block the user response
-    // Return success immediately after DB insert, then fire-and-forget the email
     const smtpHost = process.env.SMTP_HOST || "smtp.hostinger.com";
     const smtpPort = parseInt(process.env.SMTP_PORT || "465");
     const smtpUser = process.env.SMTP_USER || "contact@primestrike.co.in";
@@ -71,7 +88,6 @@ export async function POST(request: Request) {
 
     const portalUrl = new URL(request.url).origin;
 
-    // Fire and forget — email sending runs async after we return the response
     sendConfirmationEmail({
       smtpHost,
       smtpPort,
@@ -79,9 +95,11 @@ export async function POST(request: Request) {
       smtpPass,
       toEmail: email,
       studentName: name,
+      batchName: batch,
       courseSelected,
       firstClassDate: firstClassDate || "To be scheduled",
-      paidAmount: paidAmount || "Recorded",
+      paidAmount: paid,
+      balanceAmount: balance,
       phone,
       portalUrl,
     }).catch((err) => {
@@ -107,9 +125,11 @@ async function sendConfirmationEmail(opts: {
   smtpPass: string;
   toEmail: string;
   studentName: string;
+  batchName: string;
   courseSelected: string;
   firstClassDate: string;
   paidAmount: string;
+  balanceAmount: string;
   phone: string;
   portalUrl: string;
 }) {
@@ -166,9 +186,11 @@ async function sendConfirmationEmail(opts: {
             <div class="badge">Course Registration Received</div>
             <p>We have received your enrollment details for Prime Strike Academy. Our founder, <span class="highlight">Saranya</span>, and our team are excited to have you on board!</p>
             <div class="details-box">
+              <div class="details-row"><span class="details-label">Student Batch:</span> <span class="details-val">${opts.batchName}</span></div>
               <div class="details-row"><span class="details-label">Joined Course:</span> <span class="details-val">${opts.courseSelected}</span></div>
               <div class="details-row"><span class="details-label">First Class Date:</span> <span class="details-val">${opts.firstClassDate}</span></div>
-              <div class="details-row"><span class="details-label">Fees Paid Amount:</span> <span class="details-val">₹${opts.paidAmount}</span></div>
+              <div class="details-row"><span class="details-label">Paid Amount:</span> <span class="details-val" style="color: #34d399;">${opts.paidAmount}</span></div>
+              <div class="details-row"><span class="details-label">Balance Due:</span> <span class="details-val" style="color: #fbbf24;">${opts.balanceAmount}</span></div>
               <div class="details-row"><span class="details-label">Phone Number:</span> <span class="details-val">${opts.phone}</span></div>
             </div>
             <div class="cta-box">
