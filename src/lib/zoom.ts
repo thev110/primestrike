@@ -179,19 +179,38 @@ interface ZoomRegistrantApiRow {
   status: string;
 }
 
+// Splits a student's display name into Zoom's required first/last fields.
+// Zoom rejects an empty last_name (HTTP 400), and profiles often have a
+// single-word or missing name — so we fall back to the email prefix (usually
+// the person's own name) to keep the payload valid.
+export function zoomNameParts(
+  name: string | null | undefined,
+  email: string
+): { firstName: string; lastName: string } {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  const emailName =
+    (email.split("@")[0] || "").replace(/[^a-zA-Z0-9_.\- ]/g, "") || "Student";
+  const firstName = parts[0] || emailName;
+  const lastName = parts.slice(1).join(" ") || firstName;
+  return { firstName, lastName };
+}
+
 // Register one attendee and return their unique personal join link.
 // If the email is already registered, we reuse the existing link instead of erroring.
 export async function addRegistrant(
   meetingId: string,
   opts: { email: string; firstName: string; lastName?: string }
 ): Promise<ZoomRegistrantInfo> {
+  // Defensive: Zoom requires non-empty first_name AND last_name (400 otherwise).
+  const firstName = (opts.firstName || "").trim();
+  const lastName = (opts.lastName || "").trim() || firstName || "Student";
   try {
     const data = (await zoomFetch(`/meetings/${meetingId}/registrants`, {
       method: "POST",
       body: JSON.stringify({
         email: opts.email,
-        first_name: opts.firstName,
-        last_name: opts.lastName || "",
+        first_name: firstName,
+        last_name: lastName,
         auto_approve: true,
       }),
     })) as { id: string; join_url: string; status: string };

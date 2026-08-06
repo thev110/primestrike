@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getAuthedUser } from "@/lib/videoAuth";
-import { addRegistrant, isZoomConfigured } from "@/lib/zoom";
+import { addRegistrant, isZoomConfigured, zoomNameParts } from "@/lib/zoom";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -117,10 +117,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ registrant: existing });
     }
 
+    const { firstName, lastName } = zoomNameParts(user.name, user.email);
     const zoom = await addRegistrant(session.zoom_meeting_id, {
       email: user.email,
-      firstName: user.name?.split(" ")[0] || "Student",
-      lastName: user.name?.split(" ").slice(1).join(" ") || "",
+      firstName,
+      lastName,
     });
 
     const { data: row, error: iErr } = await supabaseAdmin
