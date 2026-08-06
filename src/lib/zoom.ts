@@ -145,7 +145,11 @@ export async function createRegisteredMeeting(opts: {
         join_before_host: false,
         waiting_room: true, // host must admit everyone manually
         mute_upon_entry: true,
-        meeting_authentication: false,
+        // Only authenticated Zoom users can join: a shared personal link can no
+        // longer be used anonymously — Zoom asks for a sign-in first, so a
+        // stranger can't walk in under the student's name. The host still
+        // approves everyone by name in the waiting room.
+        meeting_authentication: true,
       },
     }),
   })) as {

@@ -192,11 +192,17 @@ export default function LiveClasses() {
                     </div>
 
                     {joined && (
-                      <p className="text-[10px] text-white/35 flex items-center gap-1.5 pt-0.5">
-                        <Lock className="h-3 w-3 shrink-0" />
-                        This link is personal and tied to your account — sharing it is traceable, and the host
-                        still approves everyone at the door.
-                      </p>
+                      <>
+                        <p className="text-[10px] text-white/35 flex items-center gap-1.5 pt-0.5">
+                          <Lock className="h-3 w-3 shrink-0" />
+                          This link is personal and tied to your account — sharing it is traceable, and the host
+                          still approves everyone at the door.
+                        </p>
+                        <p className="text-[10px] text-white/35 flex items-center gap-1.5">
+                          <ShieldCheck className="h-3 w-3 shrink-0 text-gold/70" />
+                          Zoom will ask you to sign in to a free Zoom account before joining.
+                        </p>
+                      </>
                     )}
                   </motion.div>
                 );
