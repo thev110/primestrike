@@ -20,7 +20,7 @@ import {
   MapPin,
   CheckCircle2,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import * as XLSX from "xlsx";
 
 interface AgreementRow {
@@ -229,15 +229,18 @@ export default function AdminAgreements() {
         </CardContent>
       </Card>
 
-      {/* Image viewer modal — portaled to <body> so it escapes the animated tab wrapper. */}
-      <AnimatePresence>
-        {viewer &&
-          createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setViewer(null)}>
+      {/* Image viewer modal — portaled to <body> so it escapes the animated tab
+          wrapper. Rendered WITHOUT <AnimatePresence> (portal + AnimatePresence
+          can silently fail to mount). */}
+      {viewer &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={() => setViewer(null)}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
               className="bg-neutral-950 border border-white/10 rounded-2xl p-4 max-w-lg w-full"
             >
@@ -253,9 +256,8 @@ export default function AdminAgreements() {
               <img src={viewer.url} alt={viewer.title} className="w-full rounded-xl border border-white/10" />
             </motion.div>
           </div>,
-            document.body
-          )}
-      </AnimatePresence>
+          document.body
+        )}
     </div>
   );
 }

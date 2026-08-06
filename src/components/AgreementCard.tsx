@@ -18,7 +18,7 @@ import {
   PenLine,
   X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export const AGREEMENT_TEXT = `PRIME STRIKE TRADING ACADEMY — DIGITAL LEARNING AGREEMENT
 
@@ -286,15 +286,23 @@ export default function AgreementCard({ onSigned }: { onSigned?: () => void }) {
       </CardContent>
 
       {/* Signature modal — portaled to <body> so no transformed (framer-motion)
-          ancestor can trap the fixed overlay and stop it covering the screen. */}
-      <AnimatePresence>
-        {open &&
-          createPortal(
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          ancestor can trap the fixed overlay. Rendered WITHOUT <AnimatePresence>:
+          wrapping a portal in AnimatePresence can silently stop the modal from
+          mounting — the motion.div still animates in on open. */}
+      {open &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setOpen(false);
+                stopCamera();
+              }
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
               className="bg-neutral-950 border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl"
             >
               <div className="p-5 border-b border-white/10 flex items-start justify-between bg-neutral-900/50">
@@ -472,9 +480,8 @@ export default function AgreementCard({ onSigned }: { onSigned?: () => void }) {
               </div>
             </motion.div>
           </div>,
-            document.body
-          )}
-      </AnimatePresence>
+          document.body
+        )}
     </Card>
   );
 }

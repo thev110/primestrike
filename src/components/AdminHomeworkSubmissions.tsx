@@ -23,7 +23,7 @@ import {
   FileCode,
   Image as ImageIcon
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { HomeworkSubmission } from "./HomeworkUpload";
 
 export default function AdminHomeworkSubmissions() {
@@ -354,15 +354,20 @@ export default function AdminHomeworkSubmissions() {
         </CardContent>
       </Card>
 
-      {/* Mentor Feedback Modal — portaled to <body> so it escapes the animated tab wrapper. */}
-      <AnimatePresence>
-        {selectedSub &&
-          createPortal(
-            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* Mentor Feedback Modal — portaled to <body> so it escapes the animated
+          tab wrapper. Rendered WITHOUT <AnimatePresence> (portal + AnimatePresence
+          can silently fail to mount). */}
+      {selectedSub &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedSub(null);
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
               className="bg-neutral-950 border border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-4 p-6"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -425,9 +430,8 @@ export default function AdminHomeworkSubmissions() {
               </div>
             </motion.div>
           </div>,
-            document.body
-          )}
-      </AnimatePresence>
+          document.body
+        )}
     </div>
   );
 }
