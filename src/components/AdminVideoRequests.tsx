@@ -30,6 +30,7 @@ interface CatalogRow {
   storage_path: string;
   bunny_video_id?: string;
   active: boolean;
+  batch: string | null;
 }
 
 
@@ -120,6 +121,7 @@ export default function AdminVideoRequests() {
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newPath, setNewPath] = useState("");
+  const [newBatch, setNewBatch] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -220,7 +222,7 @@ export default function AdminVideoRequests() {
         const pres = await fetch("/api/admin/videos/presign", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(await authHeader()) },
-          body: JSON.stringify({ title: newTitle, description: newDesc }),
+          body: JSON.stringify({ title: newTitle, description: newDesc, batch: newBatch || null }),
         });
         const cred = await pres.json().catch(() => ({}));
         if (!pres.ok) {
@@ -245,6 +247,7 @@ export default function AdminVideoRequests() {
         setNewTitle("");
         setNewDesc("");
         setNewPath("");
+        setNewBatch("");
         setUploadFile(null);
         await load();
         return;
@@ -259,13 +262,14 @@ export default function AdminVideoRequests() {
       const res = await fetch("/api/admin/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: newPath }),
+        body: JSON.stringify({ title: newTitle, description: newDesc, storagePath: newPath, batch: newBatch || null }),
       });
 
       if (res.ok) {
         setNewTitle("");
         setNewDesc("");
         setNewPath("");
+        setNewBatch("");
         setUploadFile(null);
         await load();
       } else {
@@ -470,6 +474,22 @@ export default function AdminVideoRequests() {
                 className="bg-white/5 border-white/10 text-white h-10 text-sm"
               />
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-white/40 uppercase tracking-wider block">
+                  Batch (who can see this video)
+                </label>
+                <select
+                  value={newBatch}
+                  onChange={(e) => setNewBatch(e.target.value)}
+                  className="w-full bg-neutral-900 border border-white/10 rounded-lg text-white h-10 px-3 text-xs outline-none focus:border-gold/50"
+                >
+                  <option value="" className="bg-neutral-900">All batches (every student)</option>
+                  {["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Batch 6"].map((b) => (
+                    <option key={b} value={b} className="bg-neutral-900">{b}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Computer Device File Upload Option */}
               <div className="space-y-1">
                 <label className="text-[10px] font-semibold text-gold uppercase tracking-wider block">
@@ -574,6 +594,11 @@ export default function AdminVideoRequests() {
                         <p className={`text-sm font-medium truncate ${v.active ? "text-white" : "text-white/40"}`}>
                           {v.title}
                         </p>
+                        {v.batch && (
+                          <span className="text-[9px] font-bold bg-gold/15 text-gold border border-gold/30 px-1.5 py-0.5 rounded">
+                            {v.batch}
+                          </span>
+                        )}
                         {v.bunny_video_id && (
                           <span className="text-[9px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded font-mono">
                             Bunny Stream
@@ -583,6 +608,26 @@ export default function AdminVideoRequests() {
                       <p className="text-[10px] text-white/30 truncate">
                         {v.bunny_video_id ? `ID: ${v.bunny_video_id}` : v.storage_path}
                       </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <select
+                          value={v.batch || ""}
+                          onChange={async (e) => {
+                            const val = e.target.value || null;
+                            setCatalog((prev) => prev.map((x) => (x.id === v.id ? { ...x, batch: val } : x)));
+                            await fetch("/api/admin/videos", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json", ...(await authHeader()) },
+                              body: JSON.stringify({ id: v.id, batch: val }),
+                            });
+                          }}
+                          className="bg-neutral-900 border border-white/10 rounded text-white text-[10px] h-6 px-1.5 outline-none focus:border-gold/50 cursor-pointer"
+                        >
+                          <option value="" className="bg-neutral-900">All batches</option>
+                          {["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Batch 6"].map((b) => (
+                            <option key={b} value={b} className="bg-neutral-900">{b}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <button
                       onClick={() => toggleActive(v.id, !v.active)}

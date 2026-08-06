@@ -10,6 +10,7 @@ interface Profile {
   email: string;
   name: string;
   role: "student" | "admin";
+  batch: string | null;
   created_at: string;
 }
 

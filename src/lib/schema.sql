@@ -153,3 +153,29 @@ create policy "Only admins can delete leads" on public.leads
     (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
   );
 
+-- 9. Live Classes (Zoom) — see supabase/migrations/live_classes.sql for the full migration
+create table if not exists public.class_sessions (
+  id               uuid primary key default gen_random_uuid(),
+  title            text not null,
+  description      text,
+  starts_at        timestamptz not null,
+  duration_minutes integer not null default 120,
+  zoom_meeting_id  text,
+  zoom_start_url   text,
+  zoom_join_url    text,
+  created_at       timestamptz not null default now()
+);
+
+create table if not exists public.class_session_registrants (
+  id            uuid primary key default gen_random_uuid(),
+  session_id    uuid not null references public.class_sessions (id) on delete cascade,
+  user_id       uuid not null references auth.users (id) on delete cascade,
+  email         text not null,
+  name          text,
+  registrant_id text,
+  join_url      text,
+  status        text not null default 'pending',
+  created_at    timestamptz not null default now(),
+  unique (session_id, user_id)
+);
+

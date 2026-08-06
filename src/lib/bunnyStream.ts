@@ -3,11 +3,10 @@ import crypto from "crypto";
 // Bunny Stream helpers. Server-only — never import into a client component.
 //
 // Videos live in a Bunny Stream library with MP4 fallback and direct play
-// disabled, so the only way to watch is an HLS manifest behind a signed token.
-// We mint those tokens here, scoped to a short expiry, after the caller has
-// already verified the student holds a live grant.
+// disabled, so the only way to watch is the HLS manifest. This library's CDN
+// has pull-zone token security OFF, so manifests play without a signed token;
+// signedHlsUrl still appends one when BUNNY_STREAM_TOKEN_KEY is configured.
 
-const API_BASE = "https://api.bunny.net";
 const VIDEO_API_BASE = "https://video.bunnycdn.com";
 
 function required(name: string): string {
@@ -42,33 +41,18 @@ function signPath(path: string, expires: number): string {
   return hash;
 }
 
-// Signed HLS manifest URL for a given Bunny video GUID.
-// ttlSeconds should comfortably exceed the video length so playback does not
-// die mid-watch, but stay short enough that a leaked URL expires quickly.
+// HLS manifest URL for a given Bunny video GUID. This library's CDN has pull-zone
+// token security OFF, so the playlist is playable without a signed token — but
+// when BUNNY_STREAM_TOKEN_KEY is configured we still append one, so URLs keep
+// working if security is ever enabled.
+// ttlSeconds should comfortably exceed the video length so playback does not die
+// mid-watch, but stay short enough that a leaked URL expires quickly.
 export function signedHlsUrl(bunnyVideoId: string, ttlSeconds = 4 * 60 * 60): string {
   const path = `/${bunnyVideoId}/playlist.m3u8`;
   const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const token = signPath(path, expires);
-  return `https://${cdnHostname()}${path}?token=${token}&expires=${expires}`;
-}
-
-// Signed embed URL for Bunny's own player (handles HLS, adaptive bitrate and
-// device quirks for us). Bunny signs embeds as sha256(libraryId + key + expires + videoId).
-export function signedEmbedUrl(bunnyVideoId: string, ttlSeconds = 4 * 60 * 60): string {
-  const key = required("BUNNY_STREAM_TOKEN_KEY");
-  const lib = libraryId();
-  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const token = crypto
-    .createHash("sha256")
-    .update(key + bunnyVideoId + expires)
-    .digest("hex");
-  const params = new URLSearchParams({
-    token,
-    expires: String(expires),
-    autoplay: "true",
-    preload: "false",
-  });
-  return `https://iframe.mediadelivery.net/embed/${lib}/${bunnyVideoId}?${params}`;
+  const tokenKey = process.env.BUNNY_STREAM_TOKEN_KEY;
+  const query = tokenKey ? `?token=${signPath(path, expires)}&expires=${expires}` : "";
+  return `https://${cdnHostname()}${path}${query}`;
 }
 
 // Presigned credentials for a direct browser-to-Bunny TUS upload.
@@ -240,6 +224,16 @@ export interface BunnyVideoListItem {
   views?: number;
 }
 
+interface BunnyVideoApiItem {
+  guid?: string;
+  title?: string;
+  status?: number;
+  encodeProgress?: number;
+  length?: number;
+  dateUploaded?: string;
+  views?: number;
+}
+
 export async function listBunnyVideos(
   page = 1,
   itemsPerPage = 100
@@ -264,7 +258,7 @@ export async function listBunnyVideos(
   const data = await res.json();
   const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
 
-  return items.map((item: any) => ({
+  return items.map((item: BunnyVideoApiItem) => ({
     guid: item.guid,
     title: item.title || "Untitled Video",
     status: item.status ?? 0,

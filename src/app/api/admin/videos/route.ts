@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
     const { data: catalog, error: cErr } = await supabaseAdmin
       .from("videos")
-      .select("id, title, description, storage_path, bunny_video_id, active, created_at")
+      .select("id, title, description, storage_path, bunny_video_id, active, batch, created_at")
       .order("created_at", { ascending: false });
 
     if (cErr) {
@@ -57,8 +57,9 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/admin/videos  body: { title, description?, storagePath }
-// Publishes a bucket file into the catalog so students can request it.
+// POST /api/admin/videos  body: { title, description?, storagePath, batch? }
+// Publishes a bucket file into the catalog so students can request it. A batch
+// restricts the video to that batch only; omit for "all batches".
 export async function POST(request: Request) {
   try {
     const admin = await requireAdmin(request);
@@ -66,13 +67,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const { title, description, storagePath } = await request.json();
+    const { title, description, storagePath, batch } = await request.json();
     if (!title || !storagePath) {
       return NextResponse.json(
         { error: "title and storagePath are required." },
         { status: 400 }
       );
     }
+    const batchValue =
+      batch && /^Batch \d+$/.test(String(batch).trim()) ? String(batch).trim() : null;
 
     // Confirm the object exists in the bucket.
     const { data: listed } = await supabaseAdmin.storage
@@ -87,7 +90,12 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("videos")
-      .insert({ title, description: description || null, storage_path: storagePath })
+      .insert({
+        title,
+        description: description || null,
+        storage_path: storagePath,
+        batch: batchValue,
+      })
       .select("id")
       .single();
 
@@ -102,8 +110,9 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH /api/admin/videos  body: { id, active }
-// Toggle a catalog video active/inactive (hide without deleting).
+// PATCH /api/admin/videos  body: { id, active?, batch? }
+// Toggle a catalog video active/inactive (hide without deleting) and/or set the
+// batch it is restricted to (null = all batches).
 export async function PATCH(request: Request) {
   try {
     const admin = await requireAdmin(request);
@@ -111,17 +120,31 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const { id, active } = await request.json();
-    if (!id || typeof active !== "boolean") {
+    const { id, active, batch } = await request.json();
+    if (!id || (active !== undefined && typeof active !== "boolean")) {
       return NextResponse.json(
         { error: "id and active(boolean) are required." },
         { status: 400 }
       );
     }
+    if (batch !== undefined && batch !== null && !/^Batch \d+$/.test(String(batch).trim())) {
+      return NextResponse.json(
+        { error: "batch must be e.g. \"Batch 3\" or null." },
+        { status: 400 }
+      );
+    }
+
+    const update: Record<string, unknown> = {};
+    if (active !== undefined) update.active = active;
+    if (batch !== undefined) update.batch = batch === null ? null : String(batch).trim();
+
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+    }
 
     const { error } = await supabaseAdmin
       .from("videos")
-      .update({ active })
+      .update(update)
       .eq("id", id);
 
     if (error) {

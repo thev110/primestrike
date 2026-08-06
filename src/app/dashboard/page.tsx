@@ -24,6 +24,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import VideoLibrary from "@/components/VideoLibrary";
 import HomeworkUpload from "@/components/HomeworkUpload";
+import LiveClasses from "@/components/LiveClasses";
+import BatchCard from "@/components/BatchCard";
+import AgreementCard from "@/components/AgreementCard";
 
 interface EventItem {
   id: string;
@@ -397,8 +400,17 @@ export default function StudentDashboard() {
             </Card>
           </div>
 
-          {/* Column 3: Video library, Resources & Social links */}
+          {/* Column 3: Batch, Agreement, Live classes, Video library, Resources & Social links */}
           <div className="space-y-8">
+
+            {/* My Batch — set which batch this student belongs to */}
+            <BatchCard onSaved={() => router.refresh()} />
+
+            {/* Digital Agreement — sign with photo + signature */}
+            <AgreementCard />
+
+            {/* Live Classes — personal Zoom join links */}
+            <LiveClasses />
 
             {/* Video Library — request & watch recorded sessions */}
             <VideoLibrary />

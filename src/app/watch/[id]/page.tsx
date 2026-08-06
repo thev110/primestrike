@@ -4,10 +4,11 @@ import { useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import Hls from "hls.js";
 import { Loader2, ShieldAlert, Maximize, Minimize } from "lucide-react";
 
 // Login-gated in-app player. Verifies the student holds a live grant, opens a
-// playback session (signed Bunny embed, or the legacy Supabase proxy), and
+// playback session (Bunny HLS via hls.js, or the legacy Supabase proxy), and
 // overlays the student's email as a moving watermark.
 //
 // Fullscreen is handled on the WRAPPER, never on the video/iframe itself. Native
@@ -17,10 +18,10 @@ import { Loader2, ShieldAlert, Maximize, Minimize } from "lucide-react";
 // burned over the picture at every size.
 export default function WatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const bunnyFrameRef = useRef<HTMLIFrameElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   // Guards the view-consuming session POST against duplicate effect runs.
   const sessionStartedFor = useRef<string | null>(null);
@@ -32,7 +33,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [remaining, setRemaining] = useState("");
   const [paused, setPaused] = useState(false);
-  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [hlsUrl, setHlsUrl] = useState<string | null>(null);
   const [viewsLeft, setViewsLeft] = useState<number | null>(null);
   const [isFull, setIsFull] = useState(false);
 
@@ -87,7 +88,7 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
         setTitle(json.title || "");
         setWatermark(json.watermark || user.email || "");
         setExpiresAt(json.expiresAt || null);
-        setEmbedUrl(json.embedUrl || null);
+        setHlsUrl(json.hlsUrl || null);
         setViewsLeft(typeof json.viewsLeft === "number" ? json.viewsLeft : null);
         setState("ready");
       } catch {
@@ -122,6 +123,44 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
     const iv = setInterval(tick, 60000);
     return () => clearInterval(iv);
   }, [expiresAt]);
+
+  // Attach hls.js to the native <video> when a Bunny HLS URL is provided.
+  // Safari plays HLS natively; everything else needs MSE via hls.js. The CDN
+  // has token security off, so the playlist URL works without a signed token.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hlsUrl) return;
+
+    hlsRef.current?.destroy();
+    if (Hls.isSupported()) {
+      const hls = new Hls({ capLevelToPlayerSize: true });
+      hlsRef.current = hls;
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_evt, data) => {
+        // Fatal errors are usually a video that is still encoding on Bunny.
+        if (data?.fatal) {
+          setErrMsg(
+            "This video is still being processed. Please try again in a few minutes."
+          );
+          setState("error");
+          hls.destroy();
+          hlsRef.current = null;
+        }
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = hlsUrl;
+      video.play().catch(() => {});
+    }
+
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [hlsUrl]);
 
   // Fullscreen the WRAPPER (not the video) so the watermark stays on top.
   const toggleFullscreen = () => {
@@ -166,15 +205,11 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
     const blockCtx = (e: MouseEvent) => e.preventDefault();
 
     const handleWindowBlur = () => {
+      // Playback runs in the native <video> (hls.js or Safari), so pausing is
+      // direct — no cross-origin postMessage needed.
       if (videoRef.current) {
         videoRef.current.pause();
       }
-      // Bunny's player lives in a cross-origin iframe we cannot call pause() on,
-      // so the overlay covers it and postMessage asks the player to stop.
-      bunnyFrameRef.current?.contentWindow?.postMessage(
-        { type: "pause" },
-        "https://iframe.mediadelivery.net"
-      );
       setPaused(true);
     };
 
@@ -259,30 +294,22 @@ export default function WatchPage({ params }: { params: Promise<{ id: string }> 
               : "rounded-xl border border-neutral-800"
           }`}
         >
-          {embedUrl ? (
-            <div className={isFull ? "relative w-full" : "relative w-full aspect-video"}>
-              <iframe
-                ref={bunnyFrameRef}
-                src={embedUrl}
-                loading="lazy"
-                // No `allowFullScreen`: the player's own fullscreen button would
-                // promote the iframe above our watermark. Our button handles it.
-                allow="accelerometer; gyroscope; encrypted-media; autoplay"
-                className={isFull ? "w-full h-[100vh] border-0" : "absolute inset-0 w-full h-full border-0"}
-              />
-            </div>
-          ) : (
+          <div className={isFull ? "relative w-full" : "relative w-full aspect-video"}>
             <video
               ref={videoRef}
-              src="/api/video/stream"
+              src={hlsUrl ? undefined : "/api/video/stream"}
               controls
               controlsList="nodownload noremoteplayback noplaybackrate nofullscreen"
               disablePictureInPicture
               onContextMenu={(e) => e.preventDefault()}
               autoPlay
-              className="w-full bg-black"
+              className={
+                isFull
+                  ? "w-full h-[100vh] border-0 bg-black"
+                  : "absolute inset-0 w-full h-full border-0 bg-black"
+              }
             />
-          )}
+          </div>
 
           {/* Dual dynamic watermarks: student email burned across the video frame.
               Inside the stage, so they scale with fullscreen instead of vanishing. */}

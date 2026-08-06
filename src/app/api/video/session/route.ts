@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, VIDEO_BUCKET } from "@/lib/supabaseAdmin";
 import { getAuthedUser } from "@/lib/videoAuth";
-import { signedEmbedUrl } from "@/lib/bunnyStream";
+import { signedHlsUrl } from "@/lib/bunnyStream";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // POST /api/video/session  body: { videoId }
 // The logged-in student opens a playback session. We verify they hold a LIVE
-// (granted, non-expired, under the view cap) request for this video, then mint
-// a short-lived signed Bunny embed URL. Bunny serves adaptive-bitrate HLS from
-// its CDN, so video bytes never pass through our server.
+// (granted, non-expired, under the view cap) request for this video, then hand
+// back the Bunny HLS playlist URL. Bunny serves adaptive-bitrate HLS from its
+// CDN, so video bytes never pass through our server. (The library CDN has token
+// security disabled, so the playlist is playable without a signed token.)
 //
 // Legacy fallback: videos not yet migrated to Bunny still stream via the
 // Supabase proxy at /api/video/stream using an httpOnly cookie.
@@ -56,25 +57,30 @@ export async function POST(request: Request) {
 
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("storage_path, title, bunny_video_id")
+      .select("storage_path, title, bunny_video_id, batch")
       .eq("id", videoId)
       .single();
 
     if (vErr || !video) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+    // Batch-restricted videos can only ever be played by students of that
+    // batch, even if a stale grant row somehow exists.
+    if (video.batch && video.batch !== user.batch) {
+      return NextResponse.json({ error: "no_access" }, { status: 403 });
+    }
 
     // Build the playback URL BEFORE charging a view. Minting can fail (missing
     // Bunny config, storage error), and a student must never lose one of their
     // limited views to an attempt that never produced a playable video.
-    let playback: { source: "bunny"; embedUrl: string } | { source: "supabase"; signedUrl: string };
+    let playback: { source: "bunny"; hlsUrl: string } | { source: "supabase"; signedUrl: string };
 
     if (video.bunny_video_id) {
-      // Preferred path: signed Bunny embed, streamed straight from the CDN.
+      // Preferred path: Bunny HLS playlist, streamed straight from the CDN.
       try {
-        playback = { source: "bunny", embedUrl: signedEmbedUrl(video.bunny_video_id) };
+        playback = { source: "bunny", hlsUrl: signedHlsUrl(video.bunny_video_id) };
       } catch (err) {
-        console.error("signedEmbedUrl failed:", err);
+        console.error("signedHlsUrl failed:", err);
         return NextResponse.json({ error: "sign" }, { status: 500 });
       }
     } else {
@@ -111,7 +117,7 @@ export async function POST(request: Request) {
         {
           ok: true,
           source: "bunny",
-          embedUrl: playback.embedUrl,
+          hlsUrl: playback.hlsUrl,
           title: video.title,
           watermark: user.email,
           expiresAt: grant.expires_at,

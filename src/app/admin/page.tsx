@@ -36,11 +36,17 @@ import {
   Eye,
   X,
   Award,
-  CheckCircle2
+  CheckCircle2,
+  MonitorPlay,
+  Link2,
+  FileSignature
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AdminVideoRequests from "@/components/AdminVideoRequests";
 import AdminHomeworkSubmissions from "@/components/AdminHomeworkSubmissions";
+import AdminLiveClasses from "@/components/AdminLiveClasses";
+import AdminFormLinks from "@/components/AdminFormLinks";
+import AdminAgreements from "@/components/AdminAgreements";
 import * as XLSX from "xlsx";
 
 interface EventItem {
@@ -58,6 +64,7 @@ interface StudentProfile {
   id: string;
   email: string;
   name: string;
+  batch: string | null;
   created_at: string;
 }
 
@@ -82,7 +89,7 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos" | "homework">("events");
+  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos" | "homework" | "classes" | "links" | "agreements">("events");
 
   // Data States
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -163,6 +170,12 @@ export default function AdminDashboard() {
       }
     }
   }, [user, profile, authLoading, router]);
+
+  // Build an auth header from the current Supabase session for admin API calls.
+  const authHeader = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { Authorization: `Bearer ${session?.access_token || ""}` };
+  };
 
   // Fetch Database Data (Events, Students, & Leads)
   const fetchData = async () => {
@@ -263,7 +276,7 @@ export default function AdminDashboard() {
       
       // Refresh events list
       await fetchData();
-    } catch (err: any) {
+    } catch {
       setFormError("Could not submit. Try again.");
     } finally {
       setFormSubmitting(false);
@@ -586,6 +599,39 @@ export default function AdminDashboard() {
           >
             <FileSpreadsheet className="h-4 w-4" />
             Daily Homework Submissions
+          </button>
+          <button
+            onClick={() => setActiveTab("classes")}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-all px-2 flex items-center gap-2 ${
+              activeTab === "classes"
+                ? "border-gold text-gold"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <MonitorPlay className="h-4 w-4" />
+            Live Classes
+          </button>
+          <button
+            onClick={() => setActiveTab("links")}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-all px-2 flex items-center gap-2 ${
+              activeTab === "links"
+                ? "border-gold text-gold"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <Link2 className="h-4 w-4" />
+            Generated Links
+          </button>
+          <button
+            onClick={() => setActiveTab("agreements")}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-all px-2 flex items-center gap-2 ${
+              activeTab === "agreements"
+                ? "border-gold text-gold"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <FileSignature className="h-4 w-4" />
+            Agreements
           </button>
         </div>
 
@@ -1146,6 +1192,7 @@ export default function AdminDashboard() {
                         <tr className="border-b border-white/5 text-white/55 text-xs font-semibold uppercase tracking-wider bg-white/[0.01]">
                           <th className="py-3 px-6">Name</th>
                           <th className="py-3 px-6">Email Address</th>
+                          <th className="py-3 px-6">Batch</th>
                           <th className="py-3 px-6">Date Registered</th>
                           <th className="py-3 px-6 text-right">Actions</th>
                         </tr>
@@ -1155,6 +1202,33 @@ export default function AdminDashboard() {
                           <tr key={student.id} className="hover:bg-white/[0.01] transition-all">
                             <td className="py-3.5 px-6 font-medium text-white">{student.name || "N/A"}</td>
                             <td className="py-3.5 px-6 text-white/70">{student.email}</td>
+                            <td className="py-3.5 px-6">
+                              <select
+                                value={student.batch || ""}
+                                onChange={async (e) => {
+                                  const val = e.target.value || null;
+                                  // optimistic update
+                                  setStudents((prev) =>
+                                    prev.map((s) => (s.id === student.id ? { ...s, batch: val } : s))
+                                  );
+                                  try {
+                                    await fetch("/api/admin/students", {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+                                      body: JSON.stringify({ id: student.id, batch: val }),
+                                    });
+                                  } catch {
+                                    await fetchData();
+                                  }
+                                }}
+                                className="bg-neutral-900 border border-white/10 rounded-lg text-white text-[11px] h-8 px-2 outline-none focus:border-gold/50 cursor-pointer"
+                              >
+                                <option value="" className="bg-neutral-900">—</option>
+                                {["Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Batch 6"].map((b) => (
+                                  <option key={b} value={b} className="bg-neutral-900">{b}</option>
+                                ))}
+                              </select>
+                            </td>
                             <td className="py-3.5 px-6 text-white/55">
                               {new Date(student.created_at).toLocaleDateString("en-IN", {
                                 year: "numeric",
@@ -1202,6 +1276,36 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
           >
             <AdminHomeworkSubmissions />
+          </motion.div>
+        )}
+
+        {/* TAB 6: LIVE CLASSES (ZOOM) */}
+        {activeTab === "classes" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AdminLiveClasses />
+          </motion.div>
+        )}
+
+        {/* TAB 7: GENERATED LINKS (FORM BUILDER) */}
+        {activeTab === "links" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AdminFormLinks />
+          </motion.div>
+        )}
+
+        {/* TAB 8: DIGITAL AGREEMENTS */}
+        {activeTab === "agreements" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AdminAgreements />
           </motion.div>
         )}
 

@@ -13,6 +13,7 @@ export interface AuthedUser {
   email: string;
   role: "student" | "admin";
   name: string | null;
+  batch: string | null;
 }
 
 // Resolve the logged-in user from their Supabase access token and load their
@@ -26,7 +27,7 @@ export async function getAuthedUser(request: Request): Promise<AuthedUser | null
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("role, name, email")
+    .select("role, name, email, batch")
     .eq("id", data.user.id)
     .single();
 
@@ -35,6 +36,7 @@ export async function getAuthedUser(request: Request): Promise<AuthedUser | null
     email: profile?.email || data.user.email || "",
     role: (profile?.role as "student" | "admin") || "student",
     name: profile?.name ?? null,
+    batch: profile?.batch ?? null,
   };
 }
 

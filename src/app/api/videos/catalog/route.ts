@@ -23,13 +23,20 @@ export async function GET(request: Request) {
 
     const { data: videos, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("id, title, description, active, created_at")
+      .select("id, title, description, active, batch, created_at")
       .eq("active", true)
       .order("created_at", { ascending: false });
 
     if (vErr) {
       return NextResponse.json({ error: vErr.message }, { status: 500 });
     }
+
+    // Batch gating: a video with no batch is visible to everyone (legacy). A
+    // video with a batch is only visible to students whose profile batch
+    // matches. Admins always see the full catalog via the admin API instead.
+    const visibleVideos = (videos || []).filter(
+      (v) => !v.batch || v.batch === user.batch
+    );
 
     const { data: reqs, error: rErr } = await supabaseAdmin
       .from("video_requests")
@@ -43,7 +50,7 @@ export async function GET(request: Request) {
     const byVideo = new Map((reqs || []).map((r) => [r.video_id, r]));
     const now = Date.now();
 
-    const items = (videos || []).map((v) => {
+    const items = visibleVideos.map((v) => {
       const r = byVideo.get(v.id);
       let access: "none" | "pending" | "granted" | "expired" | "denied" = "none";
       let expiresAt: string | null = null;
@@ -64,6 +71,7 @@ export async function GET(request: Request) {
         id: v.id,
         title: v.title,
         description: v.description,
+        batch: v.batch,
         access,
         expiresAt,
         requestCount: r?.request_count ?? 0,

@@ -6,7 +6,7 @@ import { createVideo, tusCredentials } from "@/lib/bunnyStream";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// POST /api/admin/videos/presign  body: { title, description? }
+// POST /api/admin/videos/presign  body: { title, description?, batch? }
 // Creates the Bunny video record and returns presigned TUS credentials so the
 // browser can upload the file straight to Bunny.
 //
@@ -22,10 +22,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const { title, description } = await request.json();
+    const { title, description, batch } = await request.json();
     if (!title) {
       return NextResponse.json({ error: "Title is required." }, { status: 400 });
     }
+    const batchValue =
+      batch && /^Batch \d+$/.test(String(batch).trim()) ? String(batch).trim() : null;
 
     const bunnyVideoId = await createVideo(title);
 
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
         storage_path: "",
         bunny_video_id: bunnyVideoId,
         active: false,
+        batch: batchValue,
       })
       .select("id")
       .single();

@@ -20,15 +20,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "videoId is required." }, { status: 400 });
     }
 
-    // Video must exist and be active.
+    // Video must exist, be active, and — if restricted to a batch — belong to
+    // the requesting student's batch. Without this check a student could craft
+    // a request for another batch's video by guessing its ID.
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("id, active")
+      .select("id, active, batch")
       .eq("id", videoId)
       .single();
 
     if (vErr || !video || !video.active) {
       return NextResponse.json({ error: "Video not available." }, { status: 404 });
+    }
+    if (video.batch && video.batch !== user.batch) {
+      return NextResponse.json(
+        { error: "This video is not available to your batch." },
+        { status: 403 }
+      );
     }
 
     // Already have a live grant? Don't downgrade it.

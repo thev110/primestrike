@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,14 @@ import { AlertCircle, Lock, Mail, Loader2, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +27,10 @@ export default function LoginPage() {
   
   const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "";
+
+  const safeNext = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "";
 
   // Redirect if already logged in
   useEffect(() => {
@@ -26,10 +38,10 @@ export default function LoginPage() {
       if (profile?.role === "admin") {
         router.push("/admin");
       } else if (profile?.role === "student") {
-        router.push("/dashboard");
+        router.push(safeNext || "/dashboard");
       }
     }
-  }, [user, profile, authLoading, router]);
+  }, [user, profile, authLoading, router, safeNext]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,9 +83,9 @@ export default function LoginPage() {
       if (profileData?.role === "admin") {
         router.push("/admin");
       } else {
-        router.push("/dashboard");
+        router.push(safeNext || "/dashboard");
       }
-    } catch (err: any) {
+    } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error(err);
       setLoadingState(false);
