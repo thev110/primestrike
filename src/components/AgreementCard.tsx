@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -284,10 +285,12 @@ export default function AgreementCard({ onSigned }: { onSigned?: () => void }) {
         )}
       </CardContent>
 
-      {/* Signature modal */}
+      {/* Signature modal — portaled to <body> so no transformed (framer-motion)
+          ancestor can trap the fixed overlay and stop it covering the screen. */}
       <AnimatePresence>
-        {open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        {open &&
+          createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -468,8 +471,9 @@ export default function AgreementCard({ onSigned }: { onSigned?: () => void }) {
                 </Button>
               </div>
             </motion.div>
-          </div>
-        )}
+          </div>,
+            document.body
+          )}
       </AnimatePresence>
     </Card>
   );

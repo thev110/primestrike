@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -228,10 +229,11 @@ export default function AdminAgreements() {
         </CardContent>
       </Card>
 
-      {/* Image viewer modal */}
+      {/* Image viewer modal — portaled to <body> so it escapes the animated tab wrapper. */}
       <AnimatePresence>
-        {viewer && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setViewer(null)}>
+        {viewer &&
+          createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={() => setViewer(null)}>
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -250,8 +252,9 @@ export default function AdminAgreements() {
               </div>
               <img src={viewer.url} alt={viewer.title} className="w-full rounded-xl border border-white/10" />
             </motion.div>
-          </div>
-        )}
+          </div>,
+            document.body
+          )}
       </AnimatePresence>
     </div>
   );

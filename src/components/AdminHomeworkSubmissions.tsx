@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -353,10 +354,11 @@ export default function AdminHomeworkSubmissions() {
         </CardContent>
       </Card>
 
-      {/* Mentor Feedback Modal */}
+      {/* Mentor Feedback Modal — portaled to <body> so it escapes the animated tab wrapper. */}
       <AnimatePresence>
-        {selectedSub && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        {selectedSub &&
+          createPortal(
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -422,8 +424,9 @@ export default function AdminHomeworkSubmissions() {
                 </form>
               </div>
             </motion.div>
-          </div>
-        )}
+          </div>,
+            document.body
+          )}
       </AnimatePresence>
     </div>
   );
