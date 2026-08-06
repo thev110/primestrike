@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MonitorPlay, Loader2, Lock, ExternalLink, Clock, CalendarDays, ShieldCheck } from "lucide-react";
@@ -38,9 +39,17 @@ export default function LiveClasses() {
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const authHeader = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { Authorization: `Bearer ${session?.access_token || ""}` };
+  }, []);
+
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch("/api/class-sessions", { cache: "no-store" });
+      const res = await fetch("/api/class-sessions", {
+        cache: "no-store",
+        headers: await authHeader(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load classes");
       setSessions(data.sessions || []);
@@ -50,7 +59,7 @@ export default function LiveClasses() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authHeader]);
 
   useEffect(() => {
     fetchSessions();
@@ -62,7 +71,7 @@ export default function LiveClasses() {
     try {
       const res = await fetch("/api/class-sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ sessionId }),
       });
       const data = await res.json();
