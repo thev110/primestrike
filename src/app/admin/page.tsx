@@ -39,7 +39,8 @@ import {
   CheckCircle2,
   MonitorPlay,
   Link2,
-  FileSignature
+  FileSignature,
+  BookUser
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import AdminVideoRequests from "@/components/AdminVideoRequests";
@@ -47,6 +48,7 @@ import AdminHomeworkSubmissions from "@/components/AdminHomeworkSubmissions";
 import AdminLiveClasses from "@/components/AdminLiveClasses";
 import AdminFormLinks from "@/components/AdminFormLinks";
 import AdminAgreements from "@/components/AdminAgreements";
+import AdminStudentCatalogue from "@/components/AdminStudentCatalogue";
 import * as XLSX from "xlsx";
 
 interface EventItem {
@@ -89,7 +91,7 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos" | "homework" | "classes" | "links" | "agreements">("events");
+  const [activeTab, setActiveTab] = useState<"events" | "leads" | "students" | "videos" | "homework" | "classes" | "links" | "agreements" | "catalogue">("events");
 
   // Data States
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -632,6 +634,17 @@ export default function AdminDashboard() {
           >
             <FileSignature className="h-4 w-4" />
             Agreements
+          </button>
+          <button
+            onClick={() => setActiveTab("catalogue")}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-all px-2 flex items-center gap-2 ${
+              activeTab === "catalogue"
+                ? "border-gold text-gold"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <BookUser className="h-4 w-4" />
+            Student Catalogue
           </button>
         </div>
 
@@ -1306,6 +1319,16 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
           >
             <AdminAgreements />
+          </motion.div>
+        )}
+
+        {/* TAB 9: STUDENT CATALOGUE (payments & directory) */}
+        {activeTab === "catalogue" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <AdminStudentCatalogue />
           </motion.div>
         )}
 

@@ -179,3 +179,16 @@ create table if not exists public.class_session_registrants (
   unique (session_id, user_id)
 );
 
+-- 10. Student Catalogue — admin-maintained directory (see supabase/migrations/student_catalogue.sql)
+create table if not exists public.student_catalogue (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  phone         text,
+  group_name    text,
+  fee_amount    numeric default 0,
+  amount_paid   numeric default 0,
+  notes         text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
