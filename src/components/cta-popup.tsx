@@ -11,6 +11,20 @@ const DISMISS_DAYS = 7;
 const SCROLL_THRESHOLD = 0.5; // 50% scroll
 const TIME_DELAY_MS = 30_000; // 30 seconds
 
+// Marketing popup — only ever runs on public pages, never in the student/admin
+// portals or auth/utility routes. On the dashboard its near-invisible backdrop
+// (bg-black/50 over a black page) would swallow clicks on the real UI.
+const PRIVATE_PATHS = [
+  "/dashboard",
+  "/admin",
+  "/watch",
+  "/batch",
+  "/agreement",
+  "/login",
+  "/signup",
+  "/f/",
+];
+
 function isDismissed(): boolean {
   if (typeof window === "undefined") return true;
   try {
@@ -42,8 +56,9 @@ export function CTAPopup() {
   const exitShownRef = useRef(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Don't show on contact page
+  // Don't show on the contact page or any private/authed route.
   const isContactPage = pathname === "/contact";
+  const isHidden = isContactPage || PRIVATE_PATHS.some((p) => pathname.startsWith(p));
 
   const dismiss = useCallback(() => {
     setVisible(false);
@@ -64,7 +79,7 @@ export function CTAPopup() {
 
   // Scroll + time triggers
   useEffect(() => {
-    if (isContactPage || isDismissed()) return;
+    if (isHidden || isDismissed()) return;
 
     let timer: NodeJS.Timeout | null = null;
 
@@ -95,11 +110,11 @@ export function CTAPopup() {
       window.removeEventListener("scroll", onScroll);
       if (timer) clearTimeout(timer);
     };
-  }, [isContactPage]);
+  }, [isHidden]);
 
   // Exit intent (desktop only)
   useEffect(() => {
-    if (isContactPage || isDismissed()) return;
+    if (isHidden || isDismissed()) return;
 
     function onMouseLeave(e: MouseEvent) {
       if (
@@ -114,12 +129,12 @@ export function CTAPopup() {
 
     document.addEventListener("mouseleave", onMouseLeave);
     return () => document.removeEventListener("mouseleave", onMouseLeave);
-  }, [isContactPage, visible]);
+  }, [isHidden, visible]);
 
   const isOpen = visible || exitVisible;
   const isExit = exitVisible && !visible;
 
-  if (isContactPage) return null;
+  if (isHidden) return null;
 
   return (
     <AnimatePresence>
